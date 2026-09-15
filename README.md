@@ -1,3 +1,14 @@
+> [!NOTE]
+> **Independently maintained fork**
+>
+> This repository is a fork of [Curb](https://github.com/nullean/curb), originally developed by Nullean and its contributors.
+> It is maintained for our own use and downstream development, not as an official Curb distribution.
+> The original Git history, [MIT license](LICENSE.txt), and [attribution notices](NOTICE) are preserved.
+>
+> Please report fork-specific issues in [this repository's issue tracker](https://github.com/ncosentino/curb/issues).
+> Keep development discussions and pull requests for this fork in this repository.
+> The documentation links and installation commands below refer to upstream unless explicitly stated otherwise.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup.svg"/>
   <img src="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup-light.svg" alt="curb" width="176" height="96"/>
