@@ -769,7 +769,8 @@ internal static partial class Printers
 		if (node.Type is not null)
 		{
 			Node.Print(node.Type, context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			if (!node.Identifier.IsMissing && node.Identifier.RawKind != 0)
+				context.Arena.Synthetic(SyntheticText.Space);
 		}
 
 		TokenPrinter.Print(node.Identifier, context);

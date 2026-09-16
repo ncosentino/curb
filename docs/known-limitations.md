@@ -5,6 +5,13 @@ description: Current limitations in Curb's formatting output and what to expect 
 
 # Known limitations
 
+## Preview union syntax
+
+Union declarations and their members use the type and member printers rather than verbatim fallback.
+The implementation follows the pinned parser's experimental syntax representation. The separate
+preview smoke project checks wrapping and analyzer conformance with its pinned .NET 11 SDK; this is
+not a guarantee of compatibility with every later preview grammar.
+
 ## Expression-body conversions do not compose in one pass
 
 With both `csharp_style_expression_bodied_properties = true` and
