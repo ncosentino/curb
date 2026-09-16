@@ -19,8 +19,21 @@ New-Item -ItemType Directory -Path $TestDirectory -ErrorAction Stop | Out-Null
 $config = Join-Path $TestDirectory 'NuGet.Config'
 [IO.File]::WriteAllText($config, "<configuration><packageSources><clear/><add key='fork' value='$feed'/></packageSources></configuration>")
 $tool = Join-Path $TestDirectory 'tool'
-& $dotnet tool install ncosentino.curb-cli --version $Version --tool-path $tool --configfile $config
-if ($LASTEXITCODE -ne 0) { throw "Tool installation failed with exit $LASTEXITCODE." }
+$deadline = [DateTime]::UtcNow.AddMinutes(10)
+$missingVersion = "Version $Version of package ncosentino.curb-cli is not found in NuGet feeds https://api.nuget.org/v3/index.json."
+while ($true) {
+    $output = @(& $dotnet tool install ncosentino.curb-cli --version $Version --tool-path $tool --configfile $config --no-http-cache 2>&1)
+    $exitCode = $LASTEXITCODE
+    $lines = @($output | ForEach-Object { $_.ToString() })
+    $lines
+    if ($exitCode -eq 0) { break }
+    # Archive availability can precede the SDK's version-discovery metadata.
+    if ($PSCmdlet.ParameterSetName -ne 'NuGetOrg' -or $exitCode -ne 1 -or $lines -cnotcontains $missingVersion -or [DateTime]::UtcNow -ge $deadline) {
+        throw "Tool installation failed with exit $exitCode."
+    }
+    'NuGet client metadata is not available yet; retrying uncached discovery.'
+    Start-Sleep -Seconds 30
+}
 $binary = Join-Path $tool 'curb'
 $identity = & $binary --version
 if ($LASTEXITCODE -ne 0 -or $identity -cne "$Version+$ExpectedCommit") {

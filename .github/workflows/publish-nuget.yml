@@ -11,6 +11,10 @@ on:
         description: Publish the verified release using configured NuGet.org trust
         type: boolean
         default: false
+      verify_registry:
+        description: Verify existing NuGet packages without obtaining credentials or uploading
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -118,13 +122,38 @@ jobs:
             dotnet nuget push $package.Path --source https://api.nuget.org/v3/index.json --no-symbols
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+  verify:
+    if: ${{ !cancelled() && needs.inspect.result == 'success' && ((inputs.publish && needs.publish.result == 'success') || (!inputs.publish && inputs.verify_registry)) }}
+    needs: [inspect, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
       - name: Verify registry availability and installation
         shell: pwsh
         env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
           VERSION: ${{ needs.inspect.outputs.version }}
           EXPECTED_COMMIT: ${{ needs.inspect.outputs.commit }}
         run: |
-          $packages = @(./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory (Join-Path $env:RUNNER_TEMP 'promotion-packages') -Set Complete -Version $env:VERSION)
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '10.0.303') { throw "Unexpected verification SDK: $sdk" }
+          $release = ./build/distribution/Get-PublishedRelease.ps1 -Tag $env:RELEASE_TAG -PackageDirectory (Join-Path $env:RUNNER_TEMP 'verification-release')
+          if ($release.Version -cne $env:VERSION -or $release.Commit -cne $env:EXPECTED_COMMIT) {
+            throw 'The release identity changed before registry verification.'
+          }
+          $packages = $release.Packages
           $directory = Join-Path $env:RUNNER_TEMP 'registry-packages'
           New-Item -ItemType Directory -Path $directory | Out-Null
           $deadline = [DateTime]::UtcNow.AddMinutes(10)
