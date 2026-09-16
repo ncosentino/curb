@@ -563,6 +563,10 @@ public class IndentationTests : FormattingTest
 		    outer:
 		        Call();
 		    }
+
+		    private static void Call()
+		    {
+		    }
 		}
 		""",
 		editorConfig: "csharp_indent_labels = left");
