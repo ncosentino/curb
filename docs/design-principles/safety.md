@@ -34,6 +34,11 @@ Inactive conditional branches are preserved as text, not independently formatted
 symbol set. A successful runtime verification also does not establish idempotency. The
 [known limitations](../known-limitations.md) remain defects even when content verification succeeds.
 
+An active `#error` is valid directive syntax. Its deliberate compiler diagnostic does not prevent
+formatting, and the directive remains in the output so a build still fails as intended. Other syntax
+errors, including malformed directives in the same file, still cause rejection. Cleanup uses the same
+parse boundary without removing the guard.
+
 Idempotency matters more than it sounds. A formatter that does not converge makes `curb check` fail
 on files `curb format` just wrote, which turns a build integration into an infinite loop of diffs.
 

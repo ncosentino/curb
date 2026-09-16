@@ -6,6 +6,26 @@ namespace Nullean.Curb.Tests;
 public class ParsingTests
 {
 	[Test]
+	[Arguments("#error intentional guard\nclass C { }")]
+	[Arguments("#define ENABLED\n#if ENABLED\n#error intentional guard\n#endif\nclass C { }")]
+	public void Intentional_error_directives_remain_in_the_parsed_tree(string text)
+	{
+		CSharpSource.TryParse(text, out var source, out var errors).Should().BeTrue();
+		errors.Should().BeEmpty();
+		source.Root.GetDiagnostics().Should().Contain(diagnostic => diagnostic.Id == "CS1029");
+	}
+
+	[Test]
+	[Arguments("#error intentional guard\nclass C { void M( }")]
+	[Arguments("#error intentional guard\n#endif\nclass C { }")]
+	public void An_error_directive_does_not_hide_malformed_syntax(string text)
+	{
+		CSharpSource.TryParse(text, out _, out var errors).Should().BeFalse();
+		errors.Should().NotBeEmpty();
+		errors.Should().NotContain(diagnostic => diagnostic.Id == "CS1029");
+	}
+
+	[Test]
 	public async Task Parses_valid_source()
 	{
 		var parsed = CSharpSource.TryParse("class C { void M() { } }", out var source, out var errors);
