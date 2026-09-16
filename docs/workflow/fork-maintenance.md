@@ -25,7 +25,9 @@ Review refreshes as exact file/hash changes. Do not run unfiltered synchronizati
 
 ## Publication is separate
 
-Inherited Actions remain disabled until their fork-specific configuration is reviewed and authorized. Some existing package metadata, registries, container references and site settings still describe upstream.
+The fork validation workflow builds and tests without publication credentials or write permissions. Its complete corpus and platform matrix is available through an explicit full dispatch.
+
+Inherited site deployment and release tagging have no automatic trigger and are disabled in their job definitions. Some existing package metadata, registries, container references and site settings still describe upstream.
 
 Do not publish with those settings merely because the code builds. A release needs distinct fork identity and destinations, appropriate credentials, validated artifacts and explicit authorization.
 

@@ -4,9 +4,7 @@ name: create-major-tag
 # release tag, the same way actions/checkout@v5 stays on v5 across patch and minor releases.
 
 on:
-  release:
-    types:
-      - published
+  workflow_dispatch:
 
 permissions: {}
 
@@ -16,6 +14,7 @@ concurrency:
 
 jobs:
   create-major-tag:
+    if: ${{ false }}
     permissions:
       contents: write
     runs-on: ubuntu-latest

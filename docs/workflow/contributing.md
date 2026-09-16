@@ -64,7 +64,7 @@ The runner's build target includes a clean dependency. Avoid that path for a sma
 
 Use the [option onboarding procedure](../../.github/skills/add-formatting-option/SKILL.md) and [cleanup onboarding procedure](../../.github/skills/add-cleanup-rule/SKILL.md) for those changes.
 
-**Current divergence:** inherited Actions are disabled in this fork. Workflow definitions describe intended checks, not completed evidence. Full suites, corpus runs and platform matrices require approved fork CI; do not substitute an expensive local run or report a skipped check as passing.
+The fork validation workflow owns complete test execution and corpus checks. Its full manual dispatch also runs the wider platform matrix and semantic rebuild checks. Read the actual run results; a workflow definition, skipped step or historical upstream measurement is not passing evidence. Publishing remains disabled.
 
 ## Correctness
 
