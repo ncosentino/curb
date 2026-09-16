@@ -13,8 +13,8 @@ Corpus results describe the inputs, options and versions measured. They do not p
 for every C# file. The workflow definitions own the selected configurations, thresholds and conditional
 checks; not every check runs on every trigger.
 
-**Current divergence:** inherited Actions are disabled in this fork. Published historical measurements
-and workflow definitions are not evidence of a completed fork CI run.
+Published historical measurements and workflow definitions are not evidence of a completed fork CI
+run. Inspect the fork validation results for the exact commit, pinned corpus and configuration.
 
 What is measured is that {{product}}'s output is a *fixed point* of `dotnet format`: run `dotnet format`
 over a {{product}}-formatted file and nothing changes. That is what decides whether Format Document in

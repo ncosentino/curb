@@ -70,8 +70,8 @@ The repository defines checks for:
 - A native-AOT publish on all five supported platforms, each smoke-tested before packing.
 - An allocation-ratio ceiling, measured on the AOT binary rather than the JIT build.
 
-Workflow conditions determine which checks run on a given trigger. Inherited Actions are disabled in
-this fork, so those definitions must not be presented as completed evidence.
+Workflow conditions determine which checks run on a given trigger. Inspect fork validation results
+for completed evidence; inherited publication and site deployment remain disabled.
 
 ## When verification fails
 
