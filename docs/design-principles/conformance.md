@@ -5,13 +5,16 @@ description: How Curb's output is measured as a fixed point of dotnet format —
 
 # Conformance
 
-{{product}} states compatibility with `dotnet format` as a measurement, gated in CI on every push
-against a 1,196-file corpus:
+{{product}} measures compatibility with `dotnet format` by checking whether the reference tool
+accepts its output unchanged. This is a fixed-point test, not a claim that both tools always choose
+the same output from the original input.
 
-- With reflow off, {{product}}'s output is **byte-identical to `dotnet format whitespace`** — 100%, enforced as a build gate.
-- With reflow on, also **100%** — deterministic layout has no arrangement inherited from the source for `dotnet format` to disagree with, so it is the cleaner of the two.
-- With reflow on *and* `csharp_keep_existing_linebreaks = true`, **99.9%**. One file falls short: a property pattern that reflow breaks, and whose brace `dotnet format` then moves. Measured and held rather than quietly rounded up.
-- **Zero** failed or unparsable files across the corpus, also gated.
+Corpus results describe the inputs, options and versions measured. They do not prove compatibility
+for every C# file. The workflow definitions own the selected configurations, thresholds and conditional
+checks; not every check runs on every trigger.
+
+**Current divergence:** inherited Actions are disabled in this fork. Published historical measurements
+and workflow definitions are not evidence of a completed fork CI run.
 
 What is measured is that {{product}}'s output is a *fixed point* of `dotnet format`: run `dotnet format`
 over a {{product}}-formatted file and nothing changes. That is what decides whether Format Document in

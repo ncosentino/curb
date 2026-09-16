@@ -69,6 +69,11 @@ let private test (arguments:ParseResults<Arguments>) =
     // TUnit runs on Microsoft.Testing.Platform; `dotnet run` avoids the deprecated VSTest path.
     exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
 
+let private guidance (_:ParseResults<Arguments>) =
+    exec "dotnet"
+        ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"; "--"
+         "--treenode-filter"; "/*/*/GuidanceContractTests/*"]
+
 let private benchmark (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Benchmarks"; "-c"; "Release"] |> ignore
 
@@ -2210,6 +2215,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Build.Name None (Some [Clean.Name]) <| fun _ -> build parsed
 
     cmd Test.Name (Some [Build.Name]) None <| fun _ -> test parsed
+    step Guidance.Name guidance
     cmd Benchmark.Name (Some [Build.Name]) None <| fun _ -> benchmark parsed
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
     cmd Churn.Name (Some [Build.Name]) None <| fun _ -> churn parsed

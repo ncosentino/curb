@@ -9,26 +9,17 @@ Read [`.claude/skills/writing-style.md`](../writing-style.md) before writing the
 
 Creates a clean, well-formed commit following this project's conventions.
 
+Operate only on the intended fork worktree. Verify the push remote is `ncosentino/curb`,
+run the repository review procedure, and keep public text free of private/local context.
+Commit only when authorized. Do not enable hooks, tooling or publishing as a side effect.
+
 ## Steps
 
 ### 1. Check for project hooks
 
-If the repo has a hook runner, ensure it is installed before committing. Common patterns:
-
-```bash
-# Husky.Net (dotnet)
-if [ -f .husky/task-runner.json ] && [ ! -f .husky/_/husky.sh ]; then
-  dotnet tool restore && dotnet husky install
-fi
-
-# Husky (Node)
-# hooks install automatically via npm ci / npm install
-
-# lefthook
-if [ -f lefthook.yml ] || [ -f .lefthook.yml ]; then
-  lefthook install
-fi
-```
+Inspect the repository's actual hook configuration. Run configured hooks and fix their
+failures; restore a missing declared tool only when the failure establishes that need.
+Do not install a generic hook runner merely because another repository uses it.
 
 Do not use `--no-verify`.
 
@@ -52,19 +43,18 @@ Stage specific files by name — never `git add -A` or `git add .` blindly. Excl
 
 - **First line**: Imperative mood, ≤72 chars, no trailing period. Front-load the outcome — a reader scanning `git log` sees this line only.
 - **Body** (optional): One short paragraph explaining *why*, not what. Skip if the title is self-explanatory. Follow the sentence mechanics in `writing-style.md`.
-- **Trailer**: Add a `Co-Authored-By:` line that identifies the model that helped write this commit. Use whatever attribution feels accurate — the model name you know yourself to be running as, or simply `Claude` if you are uncertain. The address is always `noreply@anthropic.com`. The point is honest attribution, not a precise version string.
+- **Trailer**: Use the accurate assistant attribution required by the active session.
+  Do not give Copilot another provider's identity. Copilot CLI contributions use:
 
-Always pass the message via HEREDOC to avoid shell escaping issues:
+```text
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+```
 
-```bash
-git commit -m "$(cat <<'EOF'
-Title here
+Prepare multiline text in a UTF-8 file outside the repository and pass its absolute
+path. This works without Bash heredocs or opening an editor:
 
-Optional body explaining why.
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
+```text
+git commit --file "<absolute-message-file>"
 ```
 
 ### 5. Handle hook failures
@@ -86,7 +76,7 @@ Confirm a clean working tree.
 ### 7. Refresh the PR description if one exists
 
 ```bash
-gh pr view --json number,url,isDraft,baseRefName --jq '{number,url,isDraft,baseRefName}' 2>/dev/null
+gh pr list --repo ncosentino/curb --head "<branch>" --json number,url,isDraft,baseRefName
 ```
 
 - **No PR** → done. Say nothing.

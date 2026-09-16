@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": ".github/instructions/genesis/agent-root-files.instructions.md",
+      "sha256": "66f5a1d709baff340fb7c9bb25d882c4906f3e4e44b631ae4fa1ed99065dba30"
+    },
+    {
+      "path": ".github/instructions/genesis/async-hygiene.instructions.md",
+      "sha256": "d9aa7e387cbfab427a88d3a12e9dcbc6f5cac0f0bb3ff0840b231cd27357a7e2"
+    },
+    {
+      "path": ".github/instructions/genesis/automation-failure-handling.instructions.md",
+      "sha256": "0b995ff1d7c992fa5c23d1b175f8748a4b0631be2fae2b8eda0e99e866af043f"
+    },
+    {
+      "path": ".github/instructions/genesis/benchmarks.instructions.md",
+      "sha256": "839c8cb8420b3440e87fc94e120a8076539ab4f58fb41aba6f166d5921fab1fb"
+    },
+    {
+      "path": ".github/instructions/genesis/content-source-of-truth.instructions.md",
+      "sha256": "23712dc418e73f83e71623f52ab2e2ab554210f5ce2c7aaa800a4403323a4d16"
+    },
+    {
+      "path": ".github/instructions/genesis/file-type-isolation.instructions.md",
+      "sha256": "d6ff7cf8a8910d9199ddef049e7e565af38bd177acb66c8acb9a9c15dc9b343a"
+    },
+    {
+      "path": ".github/instructions/genesis/instructions.instructions.md",
+      "sha256": "66acf4771fe5d5e265b0b597cbcb525e338e2f4eb6578ec090cd71a622bb38ba"
+    },
+    {
+      "path": ".github/instructions/genesis/logging-sensitive-data.instructions.md",
+      "sha256": "edbba9d4dae2c6d43424eaa86c2243107bf04d053471bd638272974fa74c2ba6"
+    },
+    {
+      "path": ".github/instructions/genesis/parser-outcomes.instructions.md",
+      "sha256": "48c61476d9d36819d00e4fea81d0716b57d91ffcfec226bfd6de1892c67967a0"
+    },
+    {
+      "path": ".github/instructions/genesis/performance/concurrency-and-vectorization.instructions.md",
+      "sha256": "e3cef52950fc15b2987cbb0129ff9f69d0d13115a4968ba31c9df666ed916b05"
+    },
+    {
+      "path": ".github/instructions/genesis/performance/data-scanning-and-lookups.instructions.md",
+      "sha256": "785bfe8912f7451e6da6c16d3422875b944fd84ec65556526f8269ff77797da9"
+    },
+    {
+      "path": ".github/instructions/genesis/performance/gc-tuning.instructions.md",
+      "sha256": "3c83cf2521d329ecdd00a05e70c6c75cb0795986a9af2412f930e8b7ac345370"
+    },
+    {
+      "path": ".github/instructions/genesis/performance/span-memory-safety.instructions.md",
+      "sha256": "fd09e965b12b5f45f7c35f426c6d96ef4ee89c1b2a8a101494d1d70b060bd9ee"
+    },
+    {
+      "path": ".github/instructions/genesis/performance/streams-and-serialization.instructions.md",
+      "sha256": "d47870aa27fc731d7664ef66b75467204db30cf2351a52304231054e750e43d0"
+    },
+    {
+      "path": ".github/instructions/genesis/public-api-documentation/csharp.instructions.md",
+      "sha256": "b22a7449d04378667e1abe0f165e4a47a74f614e905096e4412797e1ec5bc475"
+    },
+    {
+      "path": ".github/instructions/genesis/regex.instructions.md",
+      "sha256": "2d475361d7e665724e3df2c4bf01ff489c1db3df06dbac0416d6fb1eb3875dbd"
+    },
+    {
+      "path": ".github/instructions/genesis/skill-authoring.instructions.md",
+      "sha256": "6f4eeb8ce6d293300fc90d7aaedc0cfba4357eac38a7fca63e36beff4da0ff9d"
+    }
+  ]
+}

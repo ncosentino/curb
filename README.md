@@ -9,6 +9,9 @@
 > Keep development discussions and pull requests for this fork in this repository.
 > The documentation links and installation commands below refer to upstream unless explicitly stated otherwise.
 
+**Fork contributor documentation:** [Contributing](docs/workflow/contributing.md),
+[agent guidance](docs/workflow/agent-guidance.md), and [fork maintenance](docs/workflow/fork-maintenance.md).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup.svg"/>
   <img src="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup-light.svg" alt="curb" width="176" height="96"/>

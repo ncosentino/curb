@@ -9,6 +9,10 @@ Read [`.claude/skills/writing-style.md`](../writing-style.md) before writing any
 
 Creates a GitHub PR body that a newcomer can orient from in under a minute: front-loaded outcome, grounded Why, behaviour-led What, verifiable by the reviewer.
 
+All PR operations target `ncosentino/curb`. Verify the remote and actual base/head,
+run the repository review procedure, and obtain authorization before pushing or opening
+a PR. Never use the upstream contribution flow or enable inherited publishing.
+
 ## Steps
 
 ### 1. Understand the branch
@@ -92,8 +96,8 @@ Check `.github/workflows/` or the repo's CONTRIBUTING guide for any enforced lab
 
 ### 7. Check whether a PR already exists
 
-```bash
-gh pr view --json number,url,baseRefName --jq '{number,url,baseRefName}' 2>/dev/null
+```text
+gh pr list --repo ncosentino/curb --head "<branch>" --json number,url,baseRefName
 ```
 
 **If a PR exists — update it.**
@@ -109,51 +113,34 @@ Write the description of **the current diff against the base** — never a log o
 
 - Preserve the original `**Prompt summary:**` verbatim unless the ask itself changed; extend it rather than replace it when scope was added.
 - Reassess the label — added commits can shift a `chore` to a `bug`.
-- Apply in one call:
+- Prepare the current body in a UTF-8 file outside the repository and apply it:
 
-```bash
-gh pr edit --title "<title>" --body "$(cat <<'EOF'
-<new body>
-EOF
-)"
+```text
+gh pr edit <number> --repo ncosentino/curb --title "<title>" --body-file "<absolute-body-file>"
 ```
 
 Add or remove the label only if it changed:
 
 ```bash
-gh pr edit --add-label "<new-label>" --remove-label "<old-label>"
+gh pr edit <number> --repo ncosentino/curb --add-label "<new-label>" --remove-label "<old-label>"
 ```
 
 **If no PR exists — create it.** Proceed to step 8.
 
 ### 8. Create the PR
 
-One call — title, label, and body together. No follow-up `gh pr edit`:
+Use one call with an explicit fork base/head, title, label and prepared body file:
 
-```bash
-gh pr create --title "<title>" --label "<label>" --body "$(cat <<'EOF'
-<lead sentence(s)>
-
-**Prompt summary:** ...
-
-## Why
-
-...
-
-## What
-
-#### ...
-
-...
-
-## Verify
-
-```bash
-<command>
+```text
+gh pr create --repo ncosentino/curb --base main --head "ncosentino:<branch>" --title "<title>" --label "<label>" --body-file "<absolute-body-file>"
 ```
-EOF
-)"
-```
+
+Use draft mode while blocking work or required evidence is incomplete. Before a ready
+PR or another push to one, reassess the whole diff, unverified assumptions and deferred
+scope. Disabled CI is not evidence. Disclose relevant missing checks in the body.
+
+Merge only when authorized and ready, using an exact head-commit guard. No operation
+in this procedure targets the original repository.
 
 ### 9. Return the PR URL
 

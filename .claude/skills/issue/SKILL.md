@@ -9,6 +9,10 @@ Read [`.claude/skills/writing-style.md`](../writing-style.md) before writing any
 
 Files a GitHub issue that matches the repo's templates, applies correct labels, and checks for duplicates first.
 
+This repository's issue workflow targets `ncosentino/curb` only. Verify the destination
+and authorization before posting. Do not contact the original repository or expose
+private/local context in a public report.
+
 ## Steps
 
 ### 1. Check for duplicates
@@ -16,7 +20,7 @@ Files a GitHub issue that matches the repo's templates, applies correct labels, 
 Search for near-duplicates before opening anything. Link any you find in the issue body rather than filing a second. Use the full URL form for all links — see `## Linking to issues and pull requests` in [`writing-style.md`](../writing-style.md).
 
 ```bash
-gh issue list --search "<key terms>" --limit 10
+gh issue list --repo ncosentino/curb --search "<key terms>" --limit 10
 ```
 
 ### 2. Determine the issue type
@@ -91,24 +95,11 @@ Do not invent new labels. Check `.github/` or the repo's CONTRIBUTING guide for 
 
 ### 6. Create the issue
 
-One call — title, labels, and body together:
+Prepare the body in a UTF-8 file outside the repository. Use one headless call with the
+explicit fork, title, existing labels and absolute body-file path:
 
-```bash
-gh issue create \
-  --title "<title>" \
-  --label "bug,needs triage" \
-  --body "$(cat <<'EOF'
-<lead sentence>
-
-### What happened
-
-...
-
-### Version or commit
-
-...
-EOF
-)"
+```text
+gh issue create --repo ncosentino/curb --title "<title>" --label "<existing-labels>" --body-file "<absolute-body-file>"
 ```
 
 Replace `bug` with `enhancement` for feature requests. Omit area or triage labels if the repo does not use them.
