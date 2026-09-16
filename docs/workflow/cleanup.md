@@ -65,8 +65,22 @@ drops it again, so the output is a fixed point.
 
 ## What is fixed
 
-`curb rules` is the live answer. Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071,
-IDE0090, IDE0240, IDE0250, IDE0251.
+`curb rules` is the live answer. The registered cleanup rules and their catalog entries are the source
+of truth; a rule may still refuse a shape that cannot be rewritten safely from its diagnostic.
+
+### IDE0047 — unnecessary parentheses
+
+The build evaluates the configured .NET parentheses preferences. Cleanup uses the reported opening
+token to find a parenthesized expression, including multiline diagnostics whose primary span ends on
+the first line. It verifies the resulting expression syntax before deleting only the delimiter tokens.
+
+Nested redundant wrappers share one plan. A required inner pair remains when removing it would change
+operator association. Tuple-name inference, constant-pattern binding, stack allocation, conditional
+build configurations and expressions beyond the verification budget are refused and remain eligible
+for forwarding.
+
+This is diagnostic-driven cleanup, not a claim that bare-folder formatting implements every
+parentheses preference or that syntax comparison proves all semantic properties.
 
 ### IDE0005 — unnecessary using directives
 
