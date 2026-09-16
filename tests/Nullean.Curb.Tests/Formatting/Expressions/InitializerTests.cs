@@ -54,7 +54,6 @@ public class InitializerTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("reflow off collapses a multi-line construct onto one line; dotnet format never joins lines")]
 	public Task Object_initializer_across_lines_puts_the_brace_on_its_own_line() => Unchanged(
 		"""
 		public class C
@@ -69,6 +68,41 @@ public class InitializerTests : FormattingTest
 		    }
 		}
 		""");
+
+	[Test]
+	public Task Nested_multiline_initializers_keep_their_layout() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var value = new Thing
+		        {
+		            Inner = new Other
+		            {
+		                Value = 1
+		            }
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Mixed_member_lines_are_preserved_when_one_per_line_is_disabled() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var value = new Thing
+		        {
+		            First = 1, Second = 2,
+		            Third = 3,
+		        };
+		    }
+		}
+		""",
+		"csharp_new_line_before_members_in_object_initializers = false");
 
 	[Test]
 	public Task Nested_object_initializer() => Unchanged(
