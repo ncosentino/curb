@@ -47,7 +47,7 @@ public class DocDumperTests
 						concat
 							syn ","
 
-			""".ReplaceLineEndings("\n"));
+			""".ReplaceLineEndings(Environment.NewLine));
 	}
 
 	[Test]
