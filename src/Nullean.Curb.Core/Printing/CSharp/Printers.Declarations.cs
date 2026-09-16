@@ -212,27 +212,21 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// Accessors collapse onto one line when they fit — <c>{ get; set; }</c> — and break otherwise.
+	/// Accessors preserve existing multiline layout or use their group's width-driven layout.
 	/// </summary>
 	/// <remarks>
-	/// With reflow off, which is the default, a group is always flat, so accessor lists stay on one
-	/// line. That matches csharp_preserve_single_line_blocks, whose default is also true.
+	/// Explicit expansion remains independent of source shape. A list already opened out in
+	/// preservation mode cannot be joined merely because its group would otherwise fit.
 	/// </remarks>
 	public static void AccessorList(AccessorListSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
 
-		// Neither key that expands an accessor list may be guarded on the source still having it on
-		// one line, because unlike every other block this printer *joins* a list that fits. Guarding
-		// is self-cancelling: expanding on the first run leaves the source multi-line, so the second
-		// run declines to expand and the group flattens it straight back.
-		//
-		// That was already true of preserve_single_line_blocks before either of these keys existed —
-		// measured on the corpus at 455 non-idempotent files and 43 that dotnet format then moved.
-		// Dropping the guard takes those to 2 and 41, so it is an improvement on both axes rather than
-		// a trade; the remaining two are a separate shape and left standing.
+		// Explicit expansion cannot depend on the old shape. Preservation separately keeps a list
+		// opened out, including one opened by a previous width-driven pass.
 		var expand = !context.Options.PlaceSimpleAccessorholderOnSingleLine
-			|| !context.Options.PreserveSingleLineBlocks;
+			|| !context.Options.PreserveSingleLineBlocks
+			|| SpansLines(node, context);
 
 		using (arena.Group())
 		{

@@ -24,6 +24,48 @@ env:
   CORPUS_COMMIT: 0c8c5868f3b41c6464095d55f7b020e2713375ba
 
 jobs:
+  preview-unions:
+    if: github.repository == 'ncosentino/curb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: |
+            10.0.303
+            11.0.100-rc.1.26425.128
+      - name: Format and compile preview union fixtures
+        shell: pwsh
+        run: |
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '10.0.303') { throw "Unexpected formatter SDK: $sdk" }
+          dotnet build src/Nullean.Curb.Cli -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $dll = Join-Path $PWD '.artifacts/bin/Nullean.Curb.Cli/release/curb.dll'
+          $fixture = Join-Path $env:RUNNER_TEMP 'union-fixture'
+          New-Item -ItemType Directory $fixture | Out-Null
+          Get-ChildItem examples/curb-union-smoketest -Force -File | Copy-Item -Destination $fixture
+          dotnet $dll format $fixture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $check = dotnet $dll check $fixture --coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not ($check -match 'printer coverage 100')) { throw 'Union syntax still uses fallback printing.' }
+          $check
+          Set-Location $fixture
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '11.0.100-rc.1.26425.128') { throw "Unexpected preview SDK: $sdk" }
+          dotnet build -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet format whitespace --no-restore --verify-no-changes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   managed:
     if: github.repository == 'ncosentino/curb'
     strategy:
@@ -38,11 +80,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: 10.0.303
       - name: Build and test
         shell: pwsh
         run: |
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '10.0.303') { throw "Unexpected managed SDK: $sdk" }
           dotnet build -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet run --no-build --project tests/Nullean.Curb.Tests -c Release
@@ -62,6 +109,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: 10.0.303
       - name: Native smoke test
@@ -69,6 +118,9 @@ jobs:
         env:
           RID: ${{ matrix.rid }}
         run: |
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '10.0.303') { throw "Unexpected native SDK: $sdk" }
           dotnet publish examples/curb-aot-smoketest -c Release -r $env:RID
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $extension = if ($IsWindows) { '.exe' } else { '' }
@@ -177,6 +229,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: 10.0.303
       - name: Check out pinned corpus
@@ -187,7 +241,9 @@ jobs:
           git -C "$RUNNER_TEMP/corpus" fetch --depth 1 origin "$CORPUS_COMMIT"
           git -C "$RUNNER_TEMP/corpus" checkout --detach FETCH_HEAD
       - name: Build
-        run: ./build.sh build -s true
+        run: |
+          test "$(dotnet --version)" = '10.0.303'
+          ./build.sh build -s true
       - name: Safe formatting, cache and idempotency
         shell: pwsh
         run: |

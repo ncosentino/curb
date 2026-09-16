@@ -244,7 +244,6 @@ public class DirectiveTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("Curb refuses a file containing #error; CSharpier filters that diagnostic instead")]
 	public Task Error_directive_is_formatted_rather_than_refused() => Unchanged(
 		"""
 		public class C
@@ -252,6 +251,36 @@ public class DirectiveTests : FormattingTest
 		#if NEVER_DEFINED
 		#error not supported
 		#endif
+		    public int Value;
+		}
+		""");
+
+	[Test]
+	public Task An_active_error_directive_is_preserved_while_code_is_formatted() => Formats(
+		"""
+		#error intentional build guard
+		public class C
+		{
+		    public int Value=1;
+		}
+		""",
+		"""
+		#error intentional build guard
+		public class C
+		{
+		    public int Value = 1;
+		}
+		""");
+
+	[Test]
+	public Task An_active_error_directive_survives_forced_round_trip() => Unchanged(
+		"""
+		#define ENABLED
+		#if ENABLED
+		#error intentional build guard
+		#endif
+		public class C
+		{
 		    public int Value;
 		}
 		""");

@@ -426,7 +426,6 @@ public class IndentationTests : FormattingTest
 		editorConfig: "csharp_indent_braces = true");
 
 	[Test]
-	[Skip("dotnet format also shifts a switch expression's arms and closes it two levels in; Curb moves only the braces, as it does everywhere else")]
 	public Task A_switch_expression_shifts_its_arms_too() => Formats(
 		"""
 		public class C
