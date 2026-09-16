@@ -101,7 +101,7 @@ public class RuleCatalogTests
 	public async Task The_rules_cleanup_owns_are_what_they_say()
 	{
 		RuleCatalog.CleanupKeys.Should().BeEquivalentTo([
-			"IDE0005", "IDE0007", "IDE0034", "IDE0040", "IDE0044",
+			"IDE0005", "IDE0007", "IDE0034", "IDE0040", "IDE0044", "IDE0047",
 			"IDE0071", "IDE0090", "IDE0240", "IDE0250", "IDE0251",
 		]);
 
