@@ -191,9 +191,6 @@ public class PlaceSimpleDeclarationBlocksTests : FormattingTest
 
 	[Test]
 	public Task An_accessor_body_collapses() => Formats(
-		// The property line joins too: once each accessor's own body collapses to one line,
-		// csharp_place_simple_accessorholder_on_single_line's own default (true, unrelated to this
-		// key) joins the now-short accessor list back onto the property's line as well.
 		"""
 		public class C
 		{
@@ -215,7 +212,11 @@ public class PlaceSimpleDeclarationBlocksTests : FormattingTest
 		"""
 		public class C
 		{
-		    public int P { get { return _p; } set { _p = value; } }
+		    public int P
+		    {
+		        get { return _p; }
+		        set { _p = value; }
+		    }
 
 		    private int _p;
 		}

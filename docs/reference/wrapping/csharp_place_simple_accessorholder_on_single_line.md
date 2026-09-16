@@ -57,9 +57,17 @@ namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    public int X
+    {
+        get;
+        set;
+    }
 
-    public string Name { get; set; }
+    public string Name
+    {
+        get;
+        set;
+    }
 }
 ```
 :::
@@ -80,9 +88,17 @@ namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    public int X
+    {
+        get;
+        set;
+    }
 
-    public string Name { get; set; }
+    public string Name
+    {
+        get;
+        set;
+    }
 }
 ```
 :::

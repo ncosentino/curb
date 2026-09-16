@@ -95,7 +95,7 @@ public sealed class CSharpSource
 		return false;
 	}
 
-	/// <summary>Parses <paramref name="source"/>. Returns <c>false</c> if it does not compile.</summary>
+	/// <summary>Parses <paramref name="source"/>. Returns <c>false</c> for malformed syntax.</summary>
 	/// <remarks>
 	/// Curb refuses to format source with syntax errors. Roslyn's recovery would happily produce a
 	/// tree, but re-printing from a guessed tree is exactly how a formatter destroys code.
@@ -117,7 +117,8 @@ public sealed class CSharpSource
 		List<Diagnostic>? diagnostics = null;
 		foreach (var d in tree.GetDiagnostics())
 		{
-			if (d.Severity == DiagnosticSeverity.Error)
+			// An intentional build guard is valid directive syntax, not a recovered parse.
+			if (d.Severity == DiagnosticSeverity.Error && d.Id != "CS1029")
 				(diagnostics ??= []).Add(d);
 		}
 

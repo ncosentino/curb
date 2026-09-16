@@ -21,6 +21,22 @@ public class FormattingRunTests
 	}
 
 	[Test]
+	public async Task A_wrapped_initializer_passes_check_before_it_can_be_cached()
+	{
+		var fs = Repo("root = true\n[*.cs]\nend_of_line = lf\nmax_line_length = 40\ncsharp_keep_existing_linebreaks = true\n");
+		fs.AddFile($"{Root}/A.cs", new MockFileData("class C { void M() { Call(longArgumentName, new Options { First = 1, Second = 2, Third = 3 }); } }"));
+		var cache = $"{Root}/curb.cache";
+
+		FormattingRun.Execute(fs, Root, write: true, cachePath: cache).Changed.Should().Be(1);
+		var check = FormattingRun.Execute(fs, Root, write: false, cachePath: cache);
+		check.Cached.Should().Be(0, "a rewritten file has not yet demonstrated a fixed point");
+		check.ExitCode.Should().Be(0);
+		check.Changed.Should().Be(0);
+		FormattingRun.Execute(fs, Root, write: false, cachePath: cache).Cached.Should().Be(1);
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_tree_that_needs_nothing_exits_zero()
 	{
 		var fs = Repo();
@@ -54,9 +70,47 @@ public class FormattingRunTests
 		var summary = FormattingRun.Execute(fs, Root, write: true);
 
 		summary.Unparsable.Should().Be(1);
+		summary.ExitCode.Should().Be(3);
 		summary.Changed.Should().Be(0);
 		fs.File.ReadAllText($"{Root}/Broken.cs").Should().Be("class Broken { void M( }");
 		await Task.CompletedTask;
+	}
+
+	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void Rejected_files_are_not_successful_or_cached(bool write)
+	{
+		var fs = Repo("root = true\n[*.cs]\nend_of_line = lf\n");
+		fs.AddFile($"{Root}/Broken.cs", new MockFileData("class Broken { void M( }"));
+		fs.AddFile($"{Root}/Good.cs", new MockFileData("class Good{ }"));
+		var cache = $"{Root}/curb.cache";
+		var report = $"{Root}/unformatted.txt";
+
+		var first = FormattingRun.Execute(fs, Root, write, cachePath: cache, unformattedListPath: report);
+		first.ExitCode.Should().Be(3, "rejection takes precedence over ordinary formatting drift");
+		first.Unparsable.Should().Be(1);
+		first.Changed.Should().Be(1);
+		fs.File.ReadAllText($"{Root}/Broken.cs").Should().Be("class Broken { void M( }");
+
+		var second = FormattingRun.Execute(fs, $"{Root}/Broken.cs", write, cachePath: cache);
+		second.ExitCode.Should().Be(3);
+		second.Unparsable.Should().Be(1);
+		second.Cached.Should().Be(0);
+	}
+
+	[Test]
+	public void Rejection_outside_the_selected_files_does_not_fail_the_run()
+	{
+		var fs = Repo();
+		fs.AddFile($"{Root}/Broken.cs", new MockFileData("class Broken { void M( }"));
+		fs.AddFile($"{Root}/Good.cs", new MockFileData("class Good { }" + Environment.NewLine));
+
+		var result = FormattingRun.Execute(fs, Root, write: false, explicitFiles: [$"{Root}/Good.cs"]);
+
+		result.ExitCode.Should().Be(0);
+		result.Files.Should().Be(1);
+		result.Unparsable.Should().Be(0);
 	}
 
 	[Test]

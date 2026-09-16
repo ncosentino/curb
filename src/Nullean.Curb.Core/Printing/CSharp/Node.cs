@@ -66,6 +66,9 @@ internal static class Node
 			case SyntaxKind.ExtensionBlockDeclaration:
 			case SyntaxKind.ClassDeclaration:
 			case SyntaxKind.StructDeclaration:
+#pragma warning disable RSEXPERIMENTAL006 // The pinned parser models preview unions as type declarations.
+			case SyntaxKind.UnionDeclaration:
+#pragma warning restore RSEXPERIMENTAL006
 			case SyntaxKind.InterfaceDeclaration:
 			case SyntaxKind.RecordDeclaration:
 			case SyntaxKind.RecordStructDeclaration:
