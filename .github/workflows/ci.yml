@@ -136,6 +136,94 @@ jobs:
         run: |
           dotnet pack src/Nullean.Curb.Cli -c Release -r $env:RID -o build/output
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        if: inputs.full
+        with:
+          name: native-package-${{ matrix.rid }}
+          path: build/output/ncosentino.curb-cli.${{ matrix.rid }}.*.nupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  packages:
+    if: github.repository == 'ncosentino/curb' && inputs.full
+    needs: [managed, native]
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
+      - name: Assemble managed and portable packages
+        run: |
+          test "$(dotnet --version)" = '10.0.303'
+          ./build.sh build -s true
+          ./build.sh generatepackages -s true
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          repository: ncosentino/curb
+          run-id: ${{ github.run_id }}
+          pattern: native-package-*
+          path: build/output
+          merge-multiple: true
+      - name: Install and exercise the fork CLI from the local feed
+        shell: pwsh
+        run: |
+          $package = @(Get-ChildItem build/output -Filter '*.nupkg' | Where-Object Name -Match '^ncosentino\.curb-cli\.\d')
+          if ($package.Count -ne 1) { throw 'Expected exactly one root CLI package.' }
+          $archive = [IO.Compression.ZipFile]::OpenRead($package[0].FullName)
+          try {
+            $entry = @($archive.Entries | Where-Object FullName -Like '*.nuspec')
+            if ($entry.Count -ne 1) { throw 'Package metadata is missing or ambiguous.' }
+            $reader = [IO.StreamReader]::new($entry[0].Open())
+            try { [xml]$manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            $version = $manifest.SelectSingleNode("//*[local-name()='metadata']/*[local-name()='version']").InnerText
+          } finally { $archive.Dispose() }
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Package version is missing.' }
+          $config = Join-Path $env:RUNNER_TEMP 'fork-nuget.config'
+          $feed = [Security.SecurityElement]::Escape((Join-Path $PWD 'build/output'))
+          [IO.File]::WriteAllText($config, "<configuration><packageSources><clear/><add key='fork' value='$feed'/></packageSources></configuration>")
+          $tool = Join-Path $env:RUNNER_TEMP 'fork-tool'
+          dotnet tool install ncosentino.curb-cli --version $version --tool-path $tool --configfile $config
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $binary = Join-Path $tool 'curb'
+          & $binary --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $probe = Join-Path $env:RUNNER_TEMP 'fork-probe.cs'
+          [IO.File]::WriteAllText($probe, 'class Probe{int Value=>1;}')
+          & $binary format $probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $binary check $probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $consumer = Join-Path $env:RUNNER_TEMP 'fork-msbuild-consumer'
+          New-Item -ItemType Directory -Path $consumer | Out-Null
+          $project = Join-Path $consumer 'Consumer.csproj'
+          [IO.File]::WriteAllText($project, "<Project Sdk='Microsoft.NET.Sdk'><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include='ncosentino.curb' Version='$version' PrivateAssets='all'/></ItemGroup></Project>")
+          $source = Join-Path $consumer 'Probe.cs'
+          $inputText = 'class Probe{int Value=>1;}'
+          [IO.File]::WriteAllText($source, $inputText)
+          dotnet restore $project --configfile $config
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build $project --no-restore --configuration Debug -p:Curb_Cache=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ([IO.File]::ReadAllText($source) -eq $inputText) { throw 'The fork MSBuild package did not format its consumer.' }
+          dotnet build $project --no-restore --configuration Release -p:Curb_Cache=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fork-packages
+          path: build/output/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
 
   corpus:
     if: github.repository == 'ncosentino/curb'

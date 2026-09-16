@@ -1,5 +1,5 @@
 name: 'curb'
-description: 'Check or format C# source with curb, driven by your .editorconfig'
+description: 'Independently maintained Curb fork; use validated CLI artifacts until action distribution is enabled'
 branding:
   icon: 'code'
   color: 'blue'
@@ -17,9 +17,10 @@ inputs:
     required: false
     default: ''
 runs:
-  using: 'docker'
-  image: 'docker://ghcr.io/nullean/curb:edge'
-  args:
-    - ${{ inputs.command }}
-    - ${{ inputs.path }}
-    - ${{ inputs.args }}
+  using: 'composite'
+  steps:
+    - name: Require an explicitly published fork distribution
+      shell: bash
+      run: |
+        echo "::error::This fork has no published action container. Use the validated fork CLI package artifacts from ncosentino/curb."
+        exit 1
