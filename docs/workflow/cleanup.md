@@ -65,8 +65,22 @@ drops it again, so the output is a fixed point.
 
 ## What is fixed
 
-`curb rules` is the live answer. Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071,
-IDE0090, IDE0240, IDE0250, IDE0251.
+`curb rules` is the live answer. The registered cleanup rules and their catalog entries are the source
+of truth; a rule may still refuse a shape that cannot be rewritten safely from its diagnostic.
+
+### IDE0047 — unnecessary parentheses
+
+The build evaluates the configured .NET parentheses preferences. Cleanup uses the reported opening
+token to find a parenthesized expression, including multiline diagnostics whose primary span ends on
+the first line. It verifies the resulting expression syntax before deleting only the delimiter tokens.
+
+Nested redundant wrappers share one plan. Chains requiring operator reassociation are refused as a
+whole, rather than partially cleaned and incorrectly reported as complete. Tuple-name inference, constant-pattern binding, stack allocation, conditional
+build configurations and expressions beyond the verification budget are refused and remain eligible
+for forwarding.
+
+This is diagnostic-driven cleanup, not a claim that bare-folder formatting implements every
+parentheses preference or that syntax comparison proves all semantic properties.
 
 ### IDE0005 — unnecessary using directives
 
@@ -96,6 +110,17 @@ a directive needed only under another would be reported as unnecessary and then 
 | IDE0034 simplify `default` | Drops `(T)` from `default(T)` | A bare `default` with no inferable target is an error. |
 | IDE0071 simplify interpolation | Drops a redundant `.ToString()` | Refused when the call takes arguments, to avoid silently losing the format. |
 | IDE0240 redundant `#nullable` | Removes the directive's line | Verified by `ContentVerifier` rather than `TokenStreamComparer`, since trivia is not in the token stream. |
+
+## Measured cleanup validation
+
+The [IDE0047 validation run](https://github.com/ncosentino/curb/actions/runs/35063886479)
+used SDK `10.0.303` and the pinned corpus plus its diagnostic seed. All 11 owned rules reported:
+410 distinct sites before cleanup, 406 resolved, and four explicitly declined using-directive
+sites remaining after a successful rebuild. No parentheses diagnostic remained. The adversarial
+safety corpus and per-case reference-style fixed points also passed.
+
+These measurements do not prove arbitrary semantic equivalence. Fresh build verdicts, conservative
+syntax gates, exact token allowances and explicit refusals remain required.
 
 ## Forwarding the remainder
 
