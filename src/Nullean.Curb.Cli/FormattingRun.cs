@@ -367,7 +367,7 @@ internal static class FormattingRun
 				+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
 		}
 
-		var exitCode = failed > 0 ? 3 : !write && changed > 0 ? 1 : 0;
+		var exitCode = failed > 0 || unparsable > 0 ? 3 : !write && changed > 0 ? 1 : 0;
 		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
 	}
 

@@ -97,10 +97,13 @@ resolved per file, not per directory, because a section can discriminate on file
 | `0` | Success. |
 | `1` | `check` found files that would change. |
 | `2` | Unknown command. |
-| `3` | A file failed verification, or a named path did not exist. |
+| `3` | A selected file could not be parsed, failed verification or could not be processed. |
 
 Only `1` means "your code needs formatting". Anything else means {{product}} did not do its job, which
 is why the build integration treats them differently.
+
+Rejected source stays untouched and is never cached as compliant. A rejected file makes the run
+fail even when other files were formatted successfully; MSBuild does not write a success stamp.
 
 ## Where next
 
