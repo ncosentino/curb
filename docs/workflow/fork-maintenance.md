@@ -90,9 +90,34 @@ reference the upstream MSBuild package in that project.
 ## NuGet.org authorization
 
 NuGet.org is the intended public feed for standard tool installation and package references.
-It needs an explicit NuGet.org owner and trusted-publishing policy before publication can run.
-GitHub repository ownership does not establish that authorization. Until it is configured,
-use the release packages; their presence does not claim a NuGet.org publication.
+GitHub repository ownership does not establish permission to publish there. Configure the
+following once before requesting publication:
+
+1. Set the repository variable `NUGET_USER` to the NuGet.org profile name, not an email address.
+2. Configure the GitHub environment `nuget-org` to allow deployments from the `main` branch only.
+3. In that NuGet.org account, create a trusted-publishing policy for owner `ncosentino`,
+   repository `curb`, workflow file `publish-nuget.yml`, and environment `nuget-org`.
+   Grant new-package and new-version publishing with these package scopes:
+
+```text
+ncosentino.curb
+ncosentino.curb-cli
+ncosentino.curb-cli.*
+```
+
+Manually run `Promote fork release to NuGet.org` with a published release tag. The default
+`publish=false` inspects its source, package identities and digests without requesting a
+NuGet credential. Actual publication requires `publish=true` from fork main and the configured
+owner policy; missing authorization fails explicitly.
+
+Promotion consumes the release's existing package bytes rather than rebuilding them. The
+dependency packages publish before the root CLI package. NuGet repository signing can change
+archive bytes, so post-publication checks validate registry package identities and exercise
+the installed CLI's exact version and source commit instead of comparing signed archive hashes.
+
+A failed or partial push is not success. Published versions are immutable; the workflow does
+not hide duplicate-version conflicts. Inspect registry state before retrying or releasing a
+new version. Until authorized publication completes, use the release downloads.
 
 ## Pull-request readiness
 

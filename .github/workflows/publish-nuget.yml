@@ -1,0 +1,146 @@
+name: Promote fork release to NuGet.org
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published fork release tag
+        required: true
+        type: string
+      publish:
+        description: Publish the verified release using configured NuGet.org trust
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-nuget-promotion
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  inspect:
+    if: github.repository == 'ncosentino/curb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect the published source and package set
+        id: release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          if ($env:PUBLISH -eq 'true' -and $env:GITHUB_REF -ne 'refs/heads/main') {
+            throw 'NuGet publication must run from fork main.'
+          }
+          $release = ./build/distribution/Get-PublishedRelease.ps1 -Tag $env:RELEASE_TAG -PackageDirectory (Join-Path $env:RUNNER_TEMP 'inspected-packages')
+          $tagCommit = git rev-parse --verify "refs/tags/$($release.Tag)^{commit}"
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $release.Commit) { throw 'The release tag and source commit disagree.' }
+          git merge-base --is-ancestor $release.Commit origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'The release source is not part of fork main.' }
+          "version=$($release.Version)" >> $env:GITHUB_OUTPUT
+          "commit=$($release.Commit)" >> $env:GITHUB_OUTPUT
+          if ($env:PUBLISH -ne 'true') { 'Package inspection passed; NuGet publication was not requested.' }
+
+  publish:
+    if: inputs.publish
+    needs: inspect
+    environment: nuget-org
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Require the configured publishing identity
+        shell: pwsh
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: |
+          if ($env:GITHUB_REPOSITORY -ne 'ncosentino/curb' -or $env:GITHUB_REF -ne 'refs/heads/main') {
+            throw 'NuGet publication is restricted to fork main.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_USER)) {
+            throw 'Set NUGET_USER and configure the matching NuGet.org trusted-publishing policy before publication.'
+          }
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
+      - name: Reverify the immutable promotion input
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_VERSION: ${{ needs.inspect.outputs.version }}
+          EXPECTED_COMMIT: ${{ needs.inspect.outputs.commit }}
+        run: |
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '10.0.303') { throw "Unexpected publication SDK: $sdk" }
+          $release = ./build/distribution/Get-PublishedRelease.ps1 -Tag $env:RELEASE_TAG -PackageDirectory (Join-Path $env:RUNNER_TEMP 'promotion-packages')
+          if ($release.Version -cne $env:EXPECTED_VERSION -or $release.Commit -cne $env:EXPECTED_COMMIT) {
+            throw 'The release identity changed after inspection.'
+          }
+      - name: Obtain a short-lived NuGet credential
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: Publish dependencies before the root tool package
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+          VERSION: ${{ needs.inspect.outputs.version }}
+        run: |
+          $packages = @(./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory (Join-Path $env:RUNNER_TEMP 'promotion-packages') -Set Complete -Version $env:VERSION)
+          $ordered = $packages | Sort-Object @{ Expression = { if ($_.Id -ceq 'ncosentino.curb-cli') { 1 } else { 0 } } }, Name
+          foreach ($package in $ordered) {
+            dotnet nuget push $package.Path --source https://api.nuget.org/v3/index.json --no-symbols
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Verify registry availability and installation
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.inspect.outputs.version }}
+          EXPECTED_COMMIT: ${{ needs.inspect.outputs.commit }}
+        run: |
+          $packages = @(./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory (Join-Path $env:RUNNER_TEMP 'promotion-packages') -Set Complete -Version $env:VERSION)
+          $directory = Join-Path $env:RUNNER_TEMP 'registry-packages'
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          $deadline = [DateTime]::UtcNow.AddMinutes(10)
+          foreach ($package in $packages) {
+            $id = $package.Id.ToLowerInvariant()
+            $version = $package.Version.ToLowerInvariant()
+            $uri = "https://api.nuget.org/v3-flatcontainer/$id/$version/$id.$version.nupkg"
+            $destination = Join-Path $directory $package.Name
+            while ($true) {
+              $response = Invoke-WebRequest -Uri $uri -OutFile $destination -PassThru -SkipHttpErrorCheck
+              if ($response.StatusCode -eq 200) { break }
+              if ($response.StatusCode -ne 404 -or [DateTime]::UtcNow -ge $deadline) {
+                throw "The registry package is unavailable: HTTP $($response.StatusCode)."
+              }
+              Start-Sleep -Seconds 30
+            }
+          }
+          ./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory $directory -Set Complete -Version $env:VERSION | Out-Null
+          ./build/distribution/Test-PackageInstallation.ps1 -NuGetOrg -Version $env:VERSION -ExpectedCommit $env:EXPECTED_COMMIT -TestDirectory (Join-Path $env:RUNNER_TEMP 'registry-consumer')

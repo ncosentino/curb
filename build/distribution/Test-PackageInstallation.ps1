@@ -1,7 +1,8 @@
 #Requires -Version 7.0
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Local')]
 param(
-    [Parameter(Mandatory)][string]$PackageDirectory,
+    [Parameter(Mandatory, ParameterSetName = 'Local')][string]$PackageDirectory,
+    [Parameter(Mandatory, ParameterSetName = 'NuGetOrg')][switch]$NuGetOrg,
     [Parameter(Mandatory)][ValidatePattern('\A\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?\z')][string]$Version,
     [Parameter(Mandatory)][ValidatePattern('\A[0-9a-f]{40}\z')][string]$ExpectedCommit,
     [Parameter(Mandatory)][string]$TestDirectory
@@ -9,7 +10,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source
-$feed = [Security.SecurityElement]::Escape((Resolve-Path -LiteralPath $PackageDirectory).Path)
+$feed = if ($PSCmdlet.ParameterSetName -eq 'NuGetOrg') {
+    'https://api.nuget.org/v3/index.json'
+} else {
+    [Security.SecurityElement]::Escape((Resolve-Path -LiteralPath $PackageDirectory).Path)
+}
 New-Item -ItemType Directory -Path $TestDirectory -ErrorAction Stop | Out-Null
 $config = Join-Path $TestDirectory 'NuGet.Config'
 [IO.File]::WriteAllText($config, "<configuration><packageSources><clear/><add key='fork' value='$feed'/></packageSources></configuration>")
