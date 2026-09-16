@@ -24,6 +24,40 @@ env:
   CORPUS_COMMIT: 0c8c5868f3b41c6464095d55f7b020e2713375ba
 
 jobs:
+  preview-unions:
+    if: github.repository == 'ncosentino/curb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0.303
+            11.0.100-rc.1.26425.128
+      - name: Format and compile preview union fixtures
+        shell: pwsh
+        run: |
+          dotnet build src/Nullean.Curb.Cli -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $dll = Join-Path $PWD '.artifacts/bin/Nullean.Curb.Cli/release/curb.dll'
+          $fixture = Join-Path $env:RUNNER_TEMP 'union-fixture'
+          New-Item -ItemType Directory $fixture | Out-Null
+          Get-ChildItem examples/curb-union-smoketest -Force -File | Copy-Item -Destination $fixture
+          dotnet $dll format $fixture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $check = dotnet $dll check $fixture --coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not ($check -match 'printer coverage 100')) { throw 'Union syntax still uses fallback printing.' }
+          $check
+          Set-Location $fixture
+          dotnet build -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet format whitespace --no-restore --verify-no-changes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   managed:
     if: github.repository == 'ncosentino/curb'
     strategy:
