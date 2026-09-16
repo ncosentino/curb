@@ -103,10 +103,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: 10.0.303
       - name: Assemble managed and portable packages
-        run: ./build.sh generatepackages -s true
+        run: |
+          test "$(dotnet --version)" = '10.0.303'
+          ./build.sh build -s true
+          ./build.sh generatepackages -s true
       - uses: actions/download-artifact@v8
         with:
           pattern: native-package-*
