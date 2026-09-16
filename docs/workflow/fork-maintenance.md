@@ -23,29 +23,43 @@ Imported rules are an explicit allowlist under the shared namespace. Keep them u
 
 Review refreshes as exact file/hash changes. Do not run unfiltered synchronization or copy a private source repository's metadata, paths, issues or operational context into this public repository.
 
-## Publication is separate
+## Artifact-free validation and publication
 
-The fork validation workflow builds and tests without publication credentials or write permissions. Its complete corpus and platform matrix is available through an explicit full dispatch.
+Ordinary fork validation builds and tests with read-only permissions. It does not upload,
+download or retain GitHub Actions artifacts. A full dispatch builds a native installation
+package in its own job instead of storing packages for another job to download.
 
 Inherited site deployment and release tagging have no automatic trigger and are disabled in their job definitions. Historical installation examples, container references and site settings still describe upstream.
-
-Do not publish with those settings merely because the code builds. A release needs distinct fork identity and destinations, appropriate credentials, validated artifacts and explicit authorization.
 
 The fork package IDs are `ncosentino.curb-cli` and `ncosentino.curb`. The CLI command remains
 `curb`; namespaces and original author/license notices are retained. Use a local tool path or
 manifest to avoid confusing the fork executable with a globally installed upstream tool.
 Reference only one Curb MSBuild distribution in a project; both packages define the same build targets.
 
-Full validation assembles native and portable packages, installs the CLI from that local feed,
-and exercises format/check builds through the MSBuild package before retaining the artifacts for seven days. These artifacts are
-not a registry release. The upload covers only package files, not the workspace or test data.
+For a fork prerelease, manually dispatch `Fork validation` with `publish_release=true`.
+That input forces the complete corpus and platform matrix, even if `full` is false. Only after
+all validation jobs succeed does the separate `Fork prerelease` workflow receive release-write
+permissions. Ordinary pushes and pull requests cannot enter that path.
 
-No test result can substitute for that authorization. A skipped or disabled workflow is not successful CI evidence.
+The release workflow rebuilds the exact validated commit and pins its package version with
+`MinVerVersionOverride`. Its jobs upload directly to a draft release, not to Actions artifact
+storage. The final job requires all eight package identities, matching versions and SHA-256
+digests, then installs the CLI and exercises the MSBuild package before publishing the prerelease.
+`SHA256SUMS` accompanies the packages.
 
-## Installing validation artifacts
+An incomplete release stays draft. Existing assets are never overwritten: identical bytes may
+be reused, while different bytes fail explicitly. A repeated whole-release dispatch for an
+existing tag fails rather than replacing it. Inspect an abandoned draft before removing it
+and retrying; do not delete a published release to reuse its version.
 
-Download the `fork-packages` artifact from a successful full validation run in this fork's
-Actions tab. Extract all its packages into one folder; the root CLI package resolves the
+This boundary is recorded in [ADR-0002](../adr/0002-artifact-free-distribution.md).
+Site deployment, container publication and inherited release automation remain disabled.
+
+## Installing release packages
+
+Download all eight `.nupkg` assets from the chosen
+[fork release](https://github.com/ncosentino/curb/releases) into one folder.
+Use its `SHA256SUMS` to verify the downloaded bytes. The root CLI package resolves the
 matching native package from that same feed.
 
 Save the following as `NuGet.Config` inside that folder. An explicit local-only configuration
@@ -60,18 +74,25 @@ avoids an inherited source mapping or an accidental public-registry fallback.
 </configuration>
 ```
 
-Replace the version placeholder with the artifact package version:
+Replace the version placeholder with the release package version:
 
 ```powershell
-$feed = (Resolve-Path '.\fork-packages').Path
+$feed = (Resolve-Path '.\curb-packages').Path
 $tools = Join-Path $PWD '.curb-tools'
-dotnet tool install ncosentino.curb-cli --version '<artifact-version>' --tool-path $tools --configfile (Join-Path $feed 'NuGet.Config')
+dotnet tool install ncosentino.curb-cli --version '<release-version>' --tool-path $tools --configfile (Join-Path $feed 'NuGet.Config')
 & (Join-Path $tools 'curb') --version
 ```
 
 For build integration, reference `ncosentino.curb` at that same version with `PrivateAssets="all"`
 and restore against the same local feed. Debug builds format; Release builds check. Do not also
 reference the upstream MSBuild package in that project.
+
+## NuGet.org authorization
+
+NuGet.org is the intended public feed for standard tool installation and package references.
+It needs an explicit NuGet.org owner and trusted-publishing policy before publication can run.
+GitHub repository ownership does not establish that authorization. Until it is configured,
+use the release packages; their presence does not claim a NuGet.org publication.
 
 ## Pull-request readiness
 

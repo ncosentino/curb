@@ -64,7 +64,7 @@ The runner's build target includes a clean dependency. Avoid that path for a sma
 
 Use the [option onboarding procedure](../../.github/skills/add-formatting-option/SKILL.md) and [cleanup onboarding procedure](../../.github/skills/add-cleanup-rule/SKILL.md) for those changes.
 
-The fork validation workflow owns complete test execution and corpus checks. Its full manual dispatch also runs the wider platform matrix and semantic rebuild checks. Read the actual run results; a workflow definition, skipped step or historical upstream measurement is not passing evidence. Publishing remains disabled.
+The fork validation workflow owns complete test execution and corpus checks. Its full manual dispatch also runs the wider platform matrix and semantic rebuild checks. Read the actual run results; a workflow definition, skipped step or historical upstream measurement is not passing evidence. Ordinary CI never publishes or retains Actions artifacts. Explicit release dispatches use the [fork publication policy](fork-maintenance.md).
 
 ## Correctness
 

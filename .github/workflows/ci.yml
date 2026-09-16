@@ -10,13 +10,17 @@ on:
         description: Run the complete corpus and platform matrix
         type: boolean
         default: false
+      publish_release:
+        description: Run complete validation and publish a fork prerelease without Actions artifacts
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: fork-validation-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ inputs.publish_release && format('fork-release-{0}', github.ref) || format('fork-validation-{0}', github.event.pull_request.number || github.ref) }}
+  cancel-in-progress: ${{ !inputs.publish_release }}
 
 env:
   DOTNET_NOLOGO: true
@@ -90,6 +94,7 @@ jobs:
           $sdk = dotnet --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ($sdk -ne '10.0.303') { throw "Unexpected managed SDK: $sdk" }
+          ./build/distribution/Test-PackageValidation.ps1 -TestDirectory (Join-Path $env:RUNNER_TEMP 'package-validation')
           dotnet build -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet run --no-build --project tests/Nullean.Curb.Tests -c Release
@@ -100,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.full && '[{"rid":"linux-x64","os":"ubuntu-latest"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"win-x64","os":"windows-latest"},{"rid":"win-arm64","os":"windows-11-arm"},{"rid":"osx-arm64","os":"macos-latest"}]' || '[{"rid":"linux-x64","os":"ubuntu-latest"}]') }}
+        include: ${{ fromJSON((inputs.full || inputs.publish_release) && '[{"rid":"linux-x64","os":"ubuntu-latest"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"win-x64","os":"windows-latest"},{"rid":"win-arm64","os":"windows-11-arm"},{"rid":"osx-arm64","os":"macos-latest"}]' || '[{"rid":"linux-x64","os":"ubuntu-latest"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -136,20 +141,12 @@ jobs:
         run: |
           dotnet pack src/Nullean.Curb.Cli -c Release -r $env:RID -o build/output
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v7
-        if: inputs.full
-        with:
-          name: native-package-${{ matrix.rid }}
-          path: build/output/ncosentino.curb-cli.${{ matrix.rid }}.*.nupkg
-          if-no-files-found: error
-          retention-days: 7
 
   packages:
-    if: github.repository == 'ncosentino/curb' && inputs.full
+    if: github.repository == 'ncosentino/curb' && (inputs.full || inputs.publish_release)
     needs: [managed, native]
-    permissions:
-      contents: read
-      actions: read
+    outputs:
+      version: ${{ steps.packages.outputs.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -167,63 +164,15 @@ jobs:
           test "$(dotnet --version)" = '10.0.303'
           ./build.sh build -s true
           ./build.sh generatepackages -s true
-      - uses: actions/download-artifact@v8
-        with:
-          github-token: ${{ github.token }}
-          repository: ncosentino/curb
-          run-id: ${{ github.run_id }}
-          pattern: native-package-*
-          path: build/output
-          merge-multiple: true
+          dotnet pack src/Nullean.Curb.Cli -c Release -r linux-x64 -o build/output
       - name: Install and exercise the fork CLI from the local feed
+        id: packages
         shell: pwsh
         run: |
-          $package = @(Get-ChildItem build/output -Filter '*.nupkg' | Where-Object Name -Match '^ncosentino\.curb-cli\.\d')
-          if ($package.Count -ne 1) { throw 'Expected exactly one root CLI package.' }
-          $archive = [IO.Compression.ZipFile]::OpenRead($package[0].FullName)
-          try {
-            $entry = @($archive.Entries | Where-Object FullName -Like '*.nuspec')
-            if ($entry.Count -ne 1) { throw 'Package metadata is missing or ambiguous.' }
-            $reader = [IO.StreamReader]::new($entry[0].Open())
-            try { [xml]$manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
-            $version = $manifest.SelectSingleNode("//*[local-name()='metadata']/*[local-name()='version']").InnerText
-          } finally { $archive.Dispose() }
-          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Package version is missing.' }
-          $config = Join-Path $env:RUNNER_TEMP 'fork-nuget.config'
-          $feed = [Security.SecurityElement]::Escape((Join-Path $PWD 'build/output'))
-          [IO.File]::WriteAllText($config, "<configuration><packageSources><clear/><add key='fork' value='$feed'/></packageSources></configuration>")
-          $tool = Join-Path $env:RUNNER_TEMP 'fork-tool'
-          dotnet tool install ncosentino.curb-cli --version $version --tool-path $tool --configfile $config
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $binary = Join-Path $tool 'curb'
-          & $binary --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $probe = Join-Path $env:RUNNER_TEMP 'fork-probe.cs'
-          [IO.File]::WriteAllText($probe, 'class Probe{int Value=>1;}')
-          & $binary format $probe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $binary check $probe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $consumer = Join-Path $env:RUNNER_TEMP 'fork-msbuild-consumer'
-          New-Item -ItemType Directory -Path $consumer | Out-Null
-          $project = Join-Path $consumer 'Consumer.csproj'
-          [IO.File]::WriteAllText($project, "<Project Sdk='Microsoft.NET.Sdk'><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include='ncosentino.curb' Version='$version' PrivateAssets='all'/></ItemGroup></Project>")
-          $source = Join-Path $consumer 'Probe.cs'
-          $inputText = 'class Probe{int Value=>1;}'
-          [IO.File]::WriteAllText($source, $inputText)
-          dotnet restore $project --configfile $config
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet build $project --no-restore --configuration Debug -p:Curb_Cache=false
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ([IO.File]::ReadAllText($source) -eq $inputText) { throw 'The fork MSBuild package did not format its consumer.' }
-          dotnet build $project --no-restore --configuration Release -p:Curb_Cache=false
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v7
-        with:
-          name: fork-packages
-          path: build/output/*.nupkg
-          if-no-files-found: error
-          retention-days: 7
+          $packages = @(./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory build/output -Set Local)
+          $version = $packages[0].Version
+          ./build/distribution/Test-PackageInstallation.ps1 -PackageDirectory build/output -Version $version -ExpectedCommit $env:GITHUB_SHA -TestDirectory (Join-Path $env:RUNNER_TEMP 'package-consumer')
+          "version=$version" >> $env:GITHUB_OUTPUT
 
   corpus:
     if: github.repository == 'ncosentino/curb'
@@ -295,7 +244,7 @@ jobs:
           ./build.sh cleanupsafety -s true --corpus "$RUNNER_TEMP/corpus"
           ./build.sh verifycleanupexpectations -s true
       - name: Full corpus configurations and semantic rebuild
-        if: inputs.full
+        if: inputs.full || inputs.publish_release
         run: |
           ./build.sh conformance -s true --corpus "$RUNNER_TEMP/corpus" --minimum 100
           ./build.sh conformance -s true --corpus "$RUNNER_TEMP/corpus" --width 120 --minimum 99.9
@@ -306,3 +255,12 @@ jobs:
           ./build.sh perf -s true --corpus "$RUNNER_TEMP/corpus" --maxallocationratio 31
           ./build.sh cleanupconformance -s true --corpus "$RUNNER_TEMP/corpus"
           ./build.sh verifyexpectationside0055 -s true
+
+  release:
+    if: github.repository == 'ncosentino/curb' && github.event_name == 'workflow_dispatch' && inputs.publish_release
+    needs: [managed, native, packages, corpus, preview-unions]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.packages.outputs.version }}
