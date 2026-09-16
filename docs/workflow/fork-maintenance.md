@@ -110,10 +110,17 @@ Manually run `Promote fork release to NuGet.org` with a published release tag. T
 NuGet credential. Actual publication requires `publish=true` from fork main and the configured
 owner policy; missing authorization fails explicitly.
 
+Use `publish=false` with `verify_registry=true` to repeat registry availability and installation
+checks without credentials or uploads. This is the recovery path when publication succeeds
+but indexing or installation verification fails; do not rerun immutable package uploads.
+
 Promotion consumes the release's existing package bytes rather than rebuilding them. The
 dependency packages publish before the root CLI package. NuGet repository signing can change
 archive bytes, so post-publication checks validate registry package identities and exercise
 the installed CLI's exact version and source commit instead of comparing signed archive hashes.
+Archive visibility does not guarantee that the NuGet client can discover a new version yet.
+Installation uses uncached requests and retries only the SDK's exact version-not-found result,
+with a bounded wait. Other installation failures remain immediate errors.
 
 A failed or partial push is not success. Published versions are immutable; the workflow does
 not hide duplicate-version conflicts. Inspect registry state before retrying or releasing a
