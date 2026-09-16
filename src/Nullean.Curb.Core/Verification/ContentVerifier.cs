@@ -69,7 +69,7 @@ internal static class ContentVerifier
 	/// <param name="inserted">
 	/// Tokens the output carries and the source does not, in output order — a modifier a cleanup rule
 	/// added, for instance. Each names its exact text <b>and its exact offset in the output</b>, so the
-	/// allowance is "precisely this word, once, here" rather than "some extra content somewhere". Every
+	/// allowance is "precisely this token, once, here" rather than "some extra content somewhere". Every
 	/// entry has to be used by the end of the file.
 	/// </param>
 	public static bool Verify(
@@ -211,7 +211,7 @@ internal static class ContentVerifier
 			// never fired and the walk desynchronised. The offset removes the guess.
 			if (inserted is not null && nextInserted < inserted.Count && !outputDone
 				&& outputIndex == inserted[nextInserted].Offset
-				&& StartsWithWord(output, outputIndex, inserted[nextInserted].Text))
+				&& StartsWithDeclaredToken(output, outputIndex, inserted[nextInserted].Text))
 			{
 				outputIndex += inserted[nextInserted].Text.Length;
 				nextInserted++;
@@ -427,6 +427,9 @@ internal static class ContentVerifier
 		var after = at + text.Length;
 		return after >= output.Length || (!char.IsLetterOrDigit(output[after]) && output[after] != '_');
 	}
+
+	private static bool StartsWithDeclaredToken(ReadOnlySpan<char> output, int at, string text) =>
+		text is "(" or ")" ? output[at] == text[0] : StartsWithWord(output, at, text);
 
 	private static string Excerpt(ReadOnlySpan<char> text, int start)
 	{

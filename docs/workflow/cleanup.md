@@ -82,6 +82,15 @@ for forwarding.
 This is diagnostic-driven cleanup, not a claim that bare-folder formatting implements every
 parentheses preference or that syntax comparison proves all semantic properties.
 
+### IDE0048 — clarity parentheses
+
+The build reports operator locations. Cleanup recovers the enclosing same-precedence binary chain,
+checks the intended syntax tree and inserts a balanced pair. Multiple diagnostics for operators in
+the same chain share one plan rather than accumulating nested parentheses.
+
+Already-parenthesized, unsupported, conditional or ambiguous targets are refused. The existing
+forwarding path remains available for shapes outside this syntax-only implementation.
+
 ### IDE0005 — unnecessary using directives
 
 Roslyn emits one IDE0005 per maximal contiguous run of unnecessary directives. The span is a delete
@@ -104,7 +113,7 @@ a directive needed only under another would be reported as unnecessary and then 
 | IDE0040 accessibility | Writes out the accessibility C# already applied | Nothing changes; the keyword was already in force. |
 | IDE0044 `readonly` | Inserts `readonly` into a field's modifier list | A compile error — a write through `ref` or `Interlocked` the analyser missed. |
 | IDE0090 `new()` | Drops the type name after `new` | A compile error: if the target type were not known, `new()` is an error. |
-| IDE0007 `var` | Replaces a local's type with `var` | **Silent.** It compiles and may narrow the declared type. The only rule whose mistake is quiet; built last and leans hardest on the freshness gate. |
+| IDE0007 `var` | Replaces a local's type with `var` | **Silent.** It compiles and may narrow the declared type. The freshness gate and build verdict are essential; successful compilation alone is insufficient. |
 | IDE0250 readonly struct | Inserts `readonly` on a struct | Does not compile if some member mutates. |
 | IDE0251 readonly member | Inserts `readonly` on a struct member | Does not compile if the member mutates. |
 | IDE0034 simplify `default` | Drops `(T)` from `default(T)` | A bare `default` with no inferable target is an error. |
@@ -113,9 +122,9 @@ a directive needed only under another would be reported as unnecessary and then 
 
 ## Measured cleanup validation
 
-The [IDE0047 validation run](https://github.com/ncosentino/curb/actions/runs/35063886479)
-used SDK `10.0.303` and the pinned corpus plus its diagnostic seed. All 11 owned rules reported:
-410 distinct sites before cleanup, 406 resolved, and four explicitly declined using-directive
+The [parentheses validation run](https://github.com/ncosentino/curb/actions/runs/35063893981)
+used SDK `10.0.303` and the pinned corpus plus its diagnostic seed. All 12 owned rules reported:
+411 distinct sites before cleanup, 407 resolved, and four explicitly declined using-directive
 sites remaining after a successful rebuild. No parentheses diagnostic remained. The adversarial
 safety corpus and per-case reference-style fixed points also passed.
 
