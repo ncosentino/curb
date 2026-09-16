@@ -991,7 +991,7 @@ internal static partial class Printers
 						Spacing.InsideCallParens(context);
 
 					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End,
-						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong);
+						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong, layoutGroup: group);
 				}
 
 				var rpar = context.Options.WrapBeforeInvocationRpar;
@@ -2059,12 +2059,14 @@ internal static partial class Printers
 	/// for the author's own arrangement — so the ordinary per-element indent-and-break-position logic
 	/// below is not needed here and is skipped rather than reused.
 	/// </param>
+	/// <param name="layoutGroup">The enclosing argument group whose breaks can move an inline argument.</param>
 	private static void PrintSeparated<T>(
 		SeparatedSyntaxList<T> list,
 		PrintContext context,
 		bool asWritten = false,
 		int anchorEnd = -1,
-		bool fill = false)
+		bool fill = false,
+		ushort layoutGroup = 0)
 		where T : SyntaxNode
 	{
 		var arena = context.Arena;
@@ -2100,12 +2102,8 @@ internal static partial class Printers
 			// An argument inline and the same argument on its own line differ for that reason alone,
 			// and dotnet format distinguishes them the same way.
 			//
-			// This is the one site where the deterministic answer is not the same shape as the
-			// preserving one. Whether the argument ends up inline is the enclosing list's group
-			// decision, so the rule wants aiming at that group rather than at the author — and under
-			// csharp_keep_existing_linebreaks = false it currently stands down instead, never
-			// compensating. That is stable and it is the conservative direction; whether it is also
-			// right is a corpus question, not one to guess at here.
+			// A reflowed separator belongs to the output group. Restore its indentation if that group
+			// breaks; an as-written separator stays inline even when a nested block breaks the group.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
 			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
 				&& EndsWithOwnBlock(value)
@@ -2113,6 +2111,7 @@ internal static partial class Printers
 				&& context.AuthorJoined(previousEnd, list[i].SpanStart);
 
 			using (arena.IndentIf(ownBlock, -1))
+			using (ownBlock && !asWritten && layoutGroup != 0 ? arena.IndentIfBroken(layoutGroup) : default)
 				Node.Print(list[i], context);
 
 			if (i >= list.SeparatorCount)

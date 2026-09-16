@@ -23,7 +23,10 @@ in one pass currently do not.
 
 ## Anchor columns feed back into the next run
 
-In certain initializer patterns, {{product}}'s output indentation can change between consecutive
-passes. An initializer anchors to the indentation of the line it starts on; when {{product}}'s own
-output moves that line, the next run anchors somewhere else. The same applies to comment alignment in
-some cases. It is the anchor mechanism being unstable under its own output on real code.
+The argument-list initializer case now anchors to the output group's line decision rather than the
+argument's original inline placement. It reaches the same indentation on the first and second pass,
+including when preservation is combined with a finite width.
+
+The broader historical report also mentions comment alignment without an isolated example.
+That comment-only case has not been established as fixed. New failures need a specific input,
+configuration and first/second output; do not assume that one corrected initializer covers all trivia.

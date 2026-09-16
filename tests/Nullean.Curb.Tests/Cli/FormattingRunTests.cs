@@ -21,6 +21,22 @@ public class FormattingRunTests
 	}
 
 	[Test]
+	public async Task A_wrapped_initializer_passes_check_before_it_can_be_cached()
+	{
+		var fs = Repo("root = true\n[*.cs]\nend_of_line = lf\nmax_line_length = 40\ncsharp_keep_existing_linebreaks = true\n");
+		fs.AddFile($"{Root}/A.cs", new MockFileData("class C { void M() { Call(longArgumentName, new Options { First = 1, Second = 2, Third = 3 }); } }"));
+		var cache = $"{Root}/curb.cache";
+
+		FormattingRun.Execute(fs, Root, write: true, cachePath: cache).Changed.Should().Be(1);
+		var check = FormattingRun.Execute(fs, Root, write: false, cachePath: cache);
+		check.Cached.Should().Be(0, "a rewritten file has not yet demonstrated a fixed point");
+		check.ExitCode.Should().Be(0);
+		check.Changed.Should().Be(0);
+		FormattingRun.Execute(fs, Root, write: false, cachePath: cache).Cached.Should().Be(1);
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_tree_that_needs_nothing_exits_zero()
 	{
 		var fs = Repo();
