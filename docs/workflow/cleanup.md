@@ -82,6 +82,15 @@ for forwarding.
 This is diagnostic-driven cleanup, not a claim that bare-folder formatting implements every
 parentheses preference or that syntax comparison proves all semantic properties.
 
+### IDE0048 — clarity parentheses
+
+The build reports operator locations. Cleanup recovers the enclosing same-precedence binary chain,
+checks the intended syntax tree and inserts a balanced pair. Multiple diagnostics for operators in
+the same chain share one plan rather than accumulating nested parentheses.
+
+Already-parenthesized, unsupported, conditional or ambiguous targets are refused. The existing
+forwarding path remains available for shapes outside this syntax-only implementation.
+
 ### IDE0005 — unnecessary using directives
 
 Roslyn emits one IDE0005 per maximal contiguous run of unnecessary directives. The span is a delete

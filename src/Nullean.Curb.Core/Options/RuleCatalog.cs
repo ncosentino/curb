@@ -149,7 +149,7 @@ public static class RuleCatalog
 		new("IDE0045", "Convert to conditional expression",                                RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE0046", "Convert to conditional expression",                                RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE0047", "Remove unnecessary parentheses",                                   RuleOwner.Cleanup, TokenDelta.Dropped),
-		new("IDE0048", "Add parentheses for clarity",                                      RuleOwner.DotnetFormatStyle, TokenDelta.None),
+		new("IDE0048", "Add parentheses for clarity",                                      RuleOwner.Cleanup, TokenDelta.Inserted),
 		new("IDE0051", "Remove unused private members",                                    RuleOwner.Never, TokenDelta.None, "The fix deletes a declaration."),
 		new("IDE0052", "Remove unread private members",                                    RuleOwner.Never, TokenDelta.None, "The fix deletes a declaration."),
 		new("IDE0053", "Use block body for lambda expression",                             RuleOwner.DotnetFormatStyle, TokenDelta.None),

@@ -69,6 +69,7 @@ public sealed class CSharpCleaner
 		new SimplifiedInterpolations(),
 		new RedundantNullableDirectives(),
 		new UnnecessaryParentheses(),
+		new ClarityParentheses(),
 	];
 
 	/// <summary>
