@@ -74,8 +74,8 @@ The build evaluates the configured .NET parentheses preferences. Cleanup uses th
 token to find a parenthesized expression, including multiline diagnostics whose primary span ends on
 the first line. It verifies the resulting expression syntax before deleting only the delimiter tokens.
 
-Nested redundant wrappers share one plan. A required inner pair remains when removing it would change
-operator association. Tuple-name inference, constant-pattern binding, stack allocation, conditional
+Nested redundant wrappers share one plan. Chains requiring operator reassociation are refused as a
+whole, rather than partially cleaned and incorrectly reported as complete. Tuple-name inference, constant-pattern binding, stack allocation, conditional
 build configurations and expressions beyond the verification budget are refused and remain eligible
 for forwarding.
 

@@ -10,7 +10,7 @@ public class ParenthesesRemovalTests
 	[Test]
 	[Arguments("a + (b * c)", "a + b * c")]
 	[Arguments("((a))", "a")]
-	[Arguments("a + ((b + c))", "a + (b + c)")]
+	[Arguments("((a + b) * c)", "(a + b) * c")]
 	[Arguments("a + (/* keep */ b * c)", "a + /* keep */ b * c")]
 	public void Removes_only_syntax_preserving_parentheses(string expression, string expected)
 	{
@@ -50,6 +50,7 @@ public class ParenthesesRemovalTests
 	[Test]
 	[Arguments("(a + b) * c")]
 	[Arguments("a + (b + c)")]
+	[Arguments("a + ((b + c))")]
 	[Arguments("(a?.Length).ToString()")]
 	[Arguments("(stackalloc int[2])")]
 	public void Refuses_parentheses_that_change_association_or_binding(string expression)

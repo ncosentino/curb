@@ -62,12 +62,8 @@ internal sealed class UnnecessaryParentheses : ICleanupRule
 		var count = chain.Count;
 		if (!CanRemove(context, node, inner.Expression, chain, count))
 		{
-			count--;
-			if (count == 0 || !CanRemove(context, node, inner, chain, count))
-			{
-				refusal = "parentheses affect syntax, association or the expression exceeds the verification budget";
-				return false;
-			}
+			refusal = "parentheses affect syntax, association or the expression exceeds the verification budget";
+			return false;
 		}
 
 		for (var index = 0; index < count; index++)
