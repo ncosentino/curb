@@ -210,7 +210,11 @@ public class ExpressionBodyTests : FormattingTest
 		"""
 		public class C
 		{
-		    public int Value { get => _x; set => _x = value; }
+		    public int Value
+		    {
+		        get => _x;
+		        set => _x = value;
+		    }
 		}
 		""",
 		editorConfig: "csharp_style_expression_bodied_accessors = true");

@@ -824,8 +824,8 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.SwitchKeyword, context);
 
-		using (arena.IndentIf(context.Options.IndentBraces))
-			arena.HardLine();
+		using var braceIndent = arena.IndentIf(context.Options.IndentBraces);
+		arena.HardLine();
 
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
