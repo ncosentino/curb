@@ -9,8 +9,8 @@
 
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>curb</ToolCommandName>
-    <PackageId>curb-cli</PackageId>
-    <Title>curb: a C# formatter driven by your .editorconfig</Title>
+    <PackageId>ncosentino.curb-cli</PackageId>
+    <Title>Curb CLI - independently maintained fork</Title>
     <Description>C# formatter with width-aware reflow while honouring the full IDE0055 .editorconfig option surface.</Description>
     <PackageTags>csharp;formatter;editorconfig;ide0055;dotnet-tool;cli</PackageTags>
     <NoWarn>$(NoWarn);CS1591</NoWarn>

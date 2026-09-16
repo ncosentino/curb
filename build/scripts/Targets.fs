@@ -1823,7 +1823,7 @@ let private generatePackages (arguments:ParseResults<Arguments>) =
     if Directory.Exists staging then Directory.Delete(staging, true)
     exec "dotnet" ["pack"; "src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"; "-c"; "Release"; "-o"; Paths.RootRelative staging] |> ignore
 
-    let ridSuffixes = Paths.AotRuntimeIdentifiers |> List.map (sprintf "curb-cli.%s.")
+    let ridSuffixes = Paths.AotRuntimeIdentifiers |> List.map (fun rid -> sprintf "%s.%s." Paths.CliPackage rid)
     DirectoryInfo(staging).GetFiles("*.nupkg")
     |> Seq.filter (fun f -> not (ridSuffixes |> List.exists f.Name.StartsWith))
     |> Seq.iter (fun f ->

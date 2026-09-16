@@ -12,6 +12,12 @@
 **Fork contributor documentation:** [Contributing](docs/workflow/contributing.md),
 [agent guidance](docs/workflow/agent-guidance.md), and [fork maintenance](docs/workflow/fork-maintenance.md).
 
+**Fork artifacts:** this fork builds `ncosentino.curb-cli` and `ncosentino.curb`.
+They are distinct from the upstream packages shown below. Full validation runs retain
+downloadable packages for seven days; no public package registry publication is enabled.
+The fork's action entrypoint fails explicitly until a fork distribution is enabled; it never
+silently runs the upstream container instead of this source.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup.svg"/>
   <img src="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup-light.svg" alt="curb" width="176" height="96"/>

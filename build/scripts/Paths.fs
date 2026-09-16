@@ -4,7 +4,9 @@ open System
 open System.IO
 
 let ToolName = "curb"
-let Repository = sprintf "nullean/%s" ToolName
+let Repository = sprintf "ncosentino/%s" ToolName
+let CliPackage = "ncosentino.curb-cli"
+let BuildPackage = "ncosentino.curb"
 let MainTFM = "net10.0"
 let SignKey = "b04a6ff7fe029dc7"
 
@@ -25,14 +27,14 @@ let Output = DirectoryInfo(Path.Combine(Root.FullName, "build", "output"))
 let AotRuntimeIdentifiers = ["linux-x64"; "linux-arm64"; "win-x64"; "win-arm64"; "osx-arm64"]
 
 /// Only the MSBuild package ships. Core, Cleanup and EditorConfig are not packable — they reach
-/// users as the payload inside the `curb` package. The root `curb-cli` tool package and its per-RID
+/// users as the payload inside the build package. The root CLI tool package and its per-RID
 /// AOT packages carry no managed assembly, so signing and API-diff checks have nothing to look at.
 let mapProjectToNuget =
     Map.empty
-        .Add("Nullean.Curb.MSBuild", "curb")
+        .Add("Nullean.Curb.MSBuild", BuildPackage)
 
 /// Packages that ship no managed assembly, so signing and API-diff checks have nothing to look at.
-let buildOnlyPackages = set [ "curb" ]
+let buildOnlyPackages = set [ BuildPackage ]
 
 let mapNugetToTFM = Map.empty<string, string>
 
