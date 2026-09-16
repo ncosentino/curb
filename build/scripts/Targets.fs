@@ -634,6 +634,10 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
           "	private static Seed Create() => new Seed();"     // IDE0090
           ""
           "	public static Seed Make() => Create();"
+          ""
+          "	public static int RemoveParentheses() => ((1));"
+          ""
+          "	public static int AddParentheses(int a, int b, int c) => a + b * c;"
           "}"
           "" ]
         |> String.concat "\n"

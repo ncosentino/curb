@@ -65,8 +65,31 @@ drops it again, so the output is a fixed point.
 
 ## What is fixed
 
-`curb rules` is the live answer. Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071,
-IDE0090, IDE0240, IDE0250, IDE0251.
+`curb rules` is the live answer. The registered cleanup rules and their catalog entries are the source
+of truth; a rule may still refuse a shape that cannot be rewritten safely from its diagnostic.
+
+### IDE0047 — unnecessary parentheses
+
+The build evaluates the configured .NET parentheses preferences. Cleanup uses the reported opening
+token to find a parenthesized expression, including multiline diagnostics whose primary span ends on
+the first line. It verifies the resulting expression syntax before deleting only the delimiter tokens.
+
+Nested redundant wrappers share one plan. Chains requiring operator reassociation are refused as a
+whole, rather than partially cleaned and incorrectly reported as complete. Tuple-name inference, constant-pattern binding, stack allocation, conditional
+build configurations and expressions beyond the verification budget are refused and remain eligible
+for forwarding.
+
+This is diagnostic-driven cleanup, not a claim that bare-folder formatting implements every
+parentheses preference or that syntax comparison proves all semantic properties.
+
+### IDE0048 — clarity parentheses
+
+The build reports operator locations. Cleanup recovers the enclosing same-precedence binary chain,
+checks the intended syntax tree and inserts a balanced pair. Multiple diagnostics for operators in
+the same chain share one plan rather than accumulating nested parentheses.
+
+Already-parenthesized, unsupported, conditional or ambiguous targets are refused. The existing
+forwarding path remains available for shapes outside this syntax-only implementation.
 
 ### IDE0005 — unnecessary using directives
 
@@ -90,12 +113,23 @@ a directive needed only under another would be reported as unnecessary and then 
 | IDE0040 accessibility | Writes out the accessibility C# already applied | Nothing changes; the keyword was already in force. |
 | IDE0044 `readonly` | Inserts `readonly` into a field's modifier list | A compile error — a write through `ref` or `Interlocked` the analyser missed. |
 | IDE0090 `new()` | Drops the type name after `new` | A compile error: if the target type were not known, `new()` is an error. |
-| IDE0007 `var` | Replaces a local's type with `var` | **Silent.** It compiles and may narrow the declared type. The only rule whose mistake is quiet; built last and leans hardest on the freshness gate. |
+| IDE0007 `var` | Replaces a local's type with `var` | **Silent.** It compiles and may narrow the declared type. The freshness gate and build verdict are essential; successful compilation alone is insufficient. |
 | IDE0250 readonly struct | Inserts `readonly` on a struct | Does not compile if some member mutates. |
 | IDE0251 readonly member | Inserts `readonly` on a struct member | Does not compile if the member mutates. |
 | IDE0034 simplify `default` | Drops `(T)` from `default(T)` | A bare `default` with no inferable target is an error. |
 | IDE0071 simplify interpolation | Drops a redundant `.ToString()` | Refused when the call takes arguments, to avoid silently losing the format. |
 | IDE0240 redundant `#nullable` | Removes the directive's line | Verified by `ContentVerifier` rather than `TokenStreamComparer`, since trivia is not in the token stream. |
+
+## Measured cleanup validation
+
+The [parentheses validation run](https://github.com/ncosentino/curb/actions/runs/35063893981)
+used SDK `10.0.303` and the pinned corpus plus its diagnostic seed. All 12 owned rules reported:
+411 distinct sites before cleanup, 407 resolved, and four explicitly declined using-directive
+sites remaining after a successful rebuild. No parentheses diagnostic remained. The adversarial
+safety corpus and per-case reference-style fixed points also passed.
+
+These measurements do not prove arbitrary semantic equivalence. Fresh build verdicts, conservative
+syntax gates, exact token allowances and explicit refusals remain required.
 
 ## Forwarding the remainder
 

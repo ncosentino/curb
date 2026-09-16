@@ -68,6 +68,8 @@ public sealed class CSharpCleaner
 		new SimplifiedDefaults(),
 		new SimplifiedInterpolations(),
 		new RedundantNullableDirectives(),
+		new UnnecessaryParentheses(),
+		new ClarityParentheses(),
 	];
 
 	/// <summary>
@@ -83,6 +85,8 @@ public sealed class CSharpCleaner
 	private readonly List<TextSpan> _dropped = [];
 	private readonly List<InsertedToken> _inserted = [];
 	private readonly List<PlannedFix> _scratch = [];
+	private readonly List<(CleanupDiagnostic Diagnostic, int Start, int Count)> _planRanges = [];
+	private readonly List<(CleanupDiagnostic Duplicate, CleanupDiagnostic Original)> _duplicatePlans = [];
 
 	/// <summary>Diagnostics fixed, which is not the same as edits made — one diagnostic can need several.</summary>
 	private int _appliedDiagnostics;
@@ -98,6 +102,8 @@ public sealed class CSharpCleaner
 		_dropped.Clear();
 		_inserted.Clear();
 		_scratch.Clear();
+		_planRanges.Clear();
+		_duplicatePlans.Clear();
 		_appliedDiagnostics = 0;
 
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
@@ -148,6 +154,13 @@ public sealed class CSharpCleaner
 			_scratch.Clear();
 			if (rule.TryFix(context, diagnostic, span, _scratch, out var refusal) && _scratch.Count > 0)
 			{
+				if (FindEquivalentPlan(diagnostic.RuleId, _scratch) is { } original)
+				{
+					_duplicatePlans.Add((diagnostic, original));
+					_appliedDiagnostics++;
+					continue;
+				}
+				_planRanges.Add((diagnostic, _planned.Count, _scratch.Count));
 				foreach (var fix in _scratch)
 					_planned.Add((fix, diagnostic));
 
@@ -190,6 +203,27 @@ public sealed class CSharpCleaner
 				return rule;
 		}
 
+		return null;
+	}
+
+	private CleanupDiagnostic? FindEquivalentPlan(string ruleId, List<PlannedFix> fixes)
+	{
+		foreach (var (diagnostic, start, count) in _planRanges)
+		{
+			if (!string.Equals(diagnostic.RuleId, ruleId, StringComparison.OrdinalIgnoreCase) || count != fixes.Count)
+				continue;
+			var equal = true;
+			for (var index = 0; index < fixes.Count && equal; index++)
+			{
+				var previous = _planned[start + index].Fix;
+				var current = fixes[index];
+				equal = previous.Removed == current.Removed && previous.Inserted == current.Inserted
+					&& previous.DroppedTokens.SequenceEqual(current.DroppedTokens)
+					&& previous.InsertedTokens.SequenceEqual(current.InsertedTokens);
+			}
+			if (equal)
+				return diagnostic;
+		}
 		return null;
 	}
 
@@ -239,6 +273,14 @@ public sealed class CSharpCleaner
 		{
 			_refusals.Add($"{diagnostic.RuleId}: its fix overlaps another, so neither was applied");
 			_unfixed.Add(diagnostic);
+			_appliedDiagnostics = Math.Max(0, _appliedDiagnostics - 1);
+		}
+		foreach (var (duplicate, original) in _duplicatePlans)
+		{
+			if (!abandoned.Contains(original))
+				continue;
+			_refusals.Add($"{duplicate.RuleId}: its shared fix overlaps another, so neither was applied");
+			_unfixed.Add(duplicate);
 			_appliedDiagnostics = Math.Max(0, _appliedDiagnostics - 1);
 		}
 
