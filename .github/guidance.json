@@ -1,0 +1,65 @@
+{
+  "$schema": "./guidance.schema.json",
+  "schemaVersion": 1,
+  "agents": {
+    "path": "AGENTS.md",
+    "maxLines": 60,
+    "maxBytes": 3072,
+    "claude": "CLAUDE.md",
+    "copilot": ".github/copilot-instructions.md"
+  },
+  "instructions": {
+    "root": ".github/instructions",
+    "sharedRoot": ".github/instructions/genesis",
+    "projectRoot": ".github/instructions/curb",
+    "imports": ".github/instructions/imports.json",
+    "maxFileLines": 100,
+    "maxFileBytes": 8192,
+    "maxMatchedLines": 300,
+    "maxMatchedBytes": 16384
+  },
+  "docs": {
+    "map": "docs/index.md",
+    "navigation": "docs/_docset.yml",
+    "adrIndex": "docs/adr/index.md",
+    "generatedReference": "docs/reference",
+    "referenceGenerator": "tools/Nullean.Curb.OptionDocs/Program.cs"
+  },
+  "review": {
+    "skill": ".github/skills/review-changes/SKILL.md",
+    "resolver": "build/guidance/Get-ApplicableInstructions.ps1",
+    "inventory": "build/guidance/Get-ValidationInventory.ps1"
+  },
+  "validation": {
+    "runnerProject": "build/scripts/scripts.fsproj",
+    "commandDefinition": "build/scripts/CommandLine.fs",
+    "targetDefinition": "build/scripts/Targets.fs",
+    "testProject": "tests/Nullean.Curb.Tests/Nullean.Curb.Tests.csproj",
+    "guidanceTarget": "guidance",
+    "guidanceTestClass": "GuidanceContractTests"
+  },
+  "representativePaths": [
+    "AGENTS.md",
+    "README.md",
+    ".github/instructions/curb/core.instructions.md",
+    ".github/skills/review-changes/SKILL.md",
+    ".github/workflows/ci.yml",
+    "Directory.Packages.props",
+    "build/guidance/Get-ApplicableInstructions.ps1",
+    "build/scripts/Targets.fs",
+    "docs/index.md",
+    "docs/adr/0001-agent-guidance-ownership.md",
+    "docs/reference/core/end_of_line.md",
+    "src/Nullean.Curb.Core/CSharpFormatter.cs",
+    "src/Nullean.Curb.Core/Options/RuleCatalog.cs",
+    "src/Nullean.Curb.Core/Printing/OutputBuffer.cs",
+    "src/Nullean.Curb.Cleanup/SarifReader.cs",
+    "src/Nullean.Curb.EditorConfig/EditorConfigOptionsBinder.cs",
+    "src/Nullean.Curb.Cli/FormattingRun.cs",
+    "src/Nullean.Curb.MSBuild/build/curb.targets",
+    "tests/Nullean.Curb.Tests/Formatting/Expressions/ReflowTests.cs",
+    "tests/Nullean.Curb.Tests/Guidance/GuidanceContractTests.cs",
+    "tests/Nullean.Curb.Benchmarks/ParseBenchmarks.cs",
+    "tools/Nullean.Curb.OptionDocs/Program.cs"
+  ]
+}

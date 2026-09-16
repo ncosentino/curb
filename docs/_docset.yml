@@ -37,6 +37,14 @@ toc:
       - file: msbuild.md
       - file: cleanup.md
       - file: agent-instructions.md
+      - file: contributing.md
+      - file: agent-guidance.md
+      - file: documentation.md
+      - file: fork-maintenance.md
+  - folder: adr
+    children:
+      - file: index.md
+      - file: 0001-agent-guidance-ownership.md
   - folder: why-not
     children:
       - file: index.md

@@ -3,6 +3,10 @@
 Every commit message, PR body, and issue filed in this repo follows these rules.
 Skills that write those artifacts read this file first.
 
+Public artifacts must not disclose private repository context, credentials or local
+machine paths. Preserve the original project's attribution without implying this fork
+is an official distribution.
+
 ---
 
 ## Governing principles (ISO 24495-1)
@@ -86,6 +90,12 @@ Cross-repo mentions include the org and repo in the link text:
 ```
 [elastic/docs-actions#412](https://github.com/elastic/docs-actions/pull/412)
 ```
+
+For necessary references to the original project's issues or PRs, use
+`redirect.github.com` instead of `github.com` in the URL to avoid creating a backlink.
+Do not use a bare cross-repository issue shorthand, closing keyword, username mention
+or review request that could create upstream activity. All ordinary issue and PR
+operations for this fork explicitly target `ncosentino/curb`.
 
 | Wrong | Right |
 |---|---|

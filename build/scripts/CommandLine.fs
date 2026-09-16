@@ -7,6 +7,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Clean
     | [<CliPrefix(CliPrefix.None);SubCommand>] Build
     | [<CliPrefix(CliPrefix.None);SubCommand>] Test
+    | [<CliPrefix(CliPrefix.None);SubCommand>] Guidance
     | [<CliPrefix(CliPrefix.None);SubCommand>] Benchmark
     | [<CliPrefix(CliPrefix.None);SubCommand>] Conformance
     | [<CliPrefix(CliPrefix.None);SubCommand>] Churn
@@ -57,6 +58,7 @@ with
             | Clean -> "clean known output locations"
             | Build -> "runs build"
             | Test -> "runs build then tests"
+            | Guidance -> "checks repository guidance with the targeted TUnit contract tests"
             | Benchmark -> "runs the BenchmarkDotNet suite against the AOT-published binary"
             | Conformance -> "measures agreement with dotnet format over a corpus (--corpus <path>)"
             | Churn -> "measures how many of a corpus's files Curb rewrites (--corpus <path>)"

@@ -23,7 +23,7 @@ Many formatters keep the AST and patch the trivia — the whitespace and comment
 
 Between the parse tree and the printer sits a document intermediate representation: a Prettier-style tree of `Text`, `Group`, `Indent`, `IfBreak` and `Line` nodes. The printer uses Wadler-Lindig's algorithm to decide where to break each group.
 
-The IR lives in a pooled struct array rather than a class-per-node graph. Every format run reuses the same arena, reset between files. A zero-allocation IR allows an O(n) verifier: a validator walks the arena in one pass and catches malformed documents in constant space. That verifier runs in debug builds and is what makes the "format(format(x)) == format(x)" guarantee checkable rather than just asserted.
+The IR lives in a pooled struct array rather than a class-per-node graph. Format runs reuse the arena between files. The debug document validator checks structural properties of that IR. It does not prove that formatting twice produces the same text; formatting tests and corpus checks measure that separate property.
 
 ## Conditional round-trip reparse
 
@@ -39,11 +39,11 @@ You can see current coverage with `curb check ./src --coverage`.
 
 ## Deliberately non-canonicalising
 
-{{product}} is idempotent: `format(format(x)) == format(x)`. It is not canonicalising: two files that parse the same way may format differently if they were written differently.
+Preservation mode intentionally permits two files with the same tokens to retain different layouts. Both layout modes require idempotency: `format(format(x)) == format(x)`. Known failures remain defects rather than evidence that the requirement is optional.
 
 The reason is `csharp_preserve_single_line_blocks` and `csharp_preserve_single_line_statements`, which are on by default. A one-liner block stays a one-liner because that is what the author chose, and `dotnet format` leaves it there too — formatting it differently would rewrite 11,000 files on roslyn alone on the strength of a style choice the repository never asked for.
 
-With `max_line_length` set and `csharp_keep_existing_linebreaks = false`, {{product}} enters deterministic layout: `format(x) = f(tokens, width)`. Tokens are invariant under formatting, so idempotency holds by construction rather than by measurement, and the class of bug where a rule's answer changes on the second run cannot be written.
+With `max_line_length` set and `csharp_keep_existing_linebreaks = false`, layout is intended to depend on tokens, options and width rather than inherited breaks. Implementation mistakes and composing syntax rewrites can still violate a fixed point. Measure the output and use [output-based layout decisions](reflow.md#writing-layout-rules) rather than treating the design as proof.
 
 ## No invented keys
 
