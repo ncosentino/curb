@@ -97,7 +97,13 @@ following once before requesting publication:
 2. Configure the GitHub environment `nuget-org` to allow deployments from the `main` branch only.
 3. In that NuGet.org account, create a trusted-publishing policy for owner `ncosentino`,
    repository `curb`, workflow file `publish-nuget.yml`, and environment `nuget-org`.
-   Grant new-package and new-version publishing for `ncosentino.curb*`.
+   Grant new-package and new-version publishing with these package scopes:
+
+```text
+ncosentino.curb
+ncosentino.curb-cli
+ncosentino.curb-cli.*
+```
 
 Manually run `Promote fork release to NuGet.org` with a published release tag. The default
 `publish=false` inspects its source, package identities and digests without requesting a
