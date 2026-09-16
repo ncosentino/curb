@@ -1767,6 +1767,8 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
         let result =
             Proc.Start("dotnet",
                 [| "build"; caseDir; "-tl:off"; "--nologo"; "-maxcpucount:1"
+                   // Every project is named Case; its intermediates must not alias concurrent builds.
+                   "-p:ArtifactsPath=" + Path.Combine(caseDir, "artifacts")
                    "-p:EnforceCodeStyleInBuild=true"
                    "-p:RunAnalyzersDuringBuild=true"
                    "-p:TreatWarningsAsErrors=false"
