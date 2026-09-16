@@ -140,13 +140,16 @@ jobs:
         if: inputs.full
         with:
           name: native-package-${{ matrix.rid }}
-          path: build/output/*.nupkg
+          path: build/output/ncosentino.curb-cli.${{ matrix.rid }}.*.nupkg
           if-no-files-found: error
           retention-days: 7
 
   packages:
     if: github.repository == 'ncosentino/curb' && inputs.full
     needs: [managed, native]
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -166,6 +169,9 @@ jobs:
           ./build.sh generatepackages -s true
       - uses: actions/download-artifact@v8
         with:
+          github-token: ${{ github.token }}
+          repository: ncosentino/curb
+          run-id: ${{ github.run_id }}
           pattern: native-package-*
           path: build/output
           merge-multiple: true
