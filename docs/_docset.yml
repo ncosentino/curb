@@ -45,6 +45,7 @@ toc:
     children:
       - file: index.md
       - file: 0001-agent-guidance-ownership.md
+      - file: 0002-artifact-free-distribution.md
   - folder: why-not
     children:
       - file: index.md

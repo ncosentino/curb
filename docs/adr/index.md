@@ -10,3 +10,4 @@ These records govern significant decisions in this fork. Preserve accepted reaso
 | Record | Status | Scope |
 |---|---|---|
 | [ADR-0001](0001-agent-guidance-ownership.md) | Accepted | Shared instruction imports, project-owned guidance and structural enforcement |
+| [ADR-0002](0002-artifact-free-distribution.md) | Accepted | Runner-local validation, direct Release uploads and separately authorized NuGet.org publication |

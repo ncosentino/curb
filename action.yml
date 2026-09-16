@@ -1,5 +1,5 @@
 name: 'curb'
-description: 'Independently maintained Curb fork; use validated CLI artifacts until action distribution is enabled'
+description: 'Independently maintained Curb fork; use CLI packages from fork Releases until action distribution is enabled'
 branding:
   icon: 'code'
   color: 'blue'
@@ -22,5 +22,5 @@ runs:
     - name: Require an explicitly published fork distribution
       shell: bash
       run: |
-        echo "::error::This fork has no published action container. Use the validated fork CLI package artifacts from ncosentino/curb."
+        echo "::error::This fork has no published action container. Use the CLI packages at https://github.com/ncosentino/curb/releases."
         exit 1

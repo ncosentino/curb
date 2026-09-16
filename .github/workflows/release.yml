@@ -1,0 +1,184 @@
+name: Fork prerelease
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  MinVerVersionOverride: ${{ inputs.version }}
+
+jobs:
+  prepare:
+    if: github.repository == 'ncosentino/curb' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create an unpublished fork release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:VERSION -cnotmatch '\A\d+\.\d+\.\d+-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*\z') {
+            throw 'This workflow publishes prerelease versions only.'
+          }
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          $body = "Independently maintained Curb fork. Nullean and contributor attribution, the MIT license and NOTICE remain intact.`n`nVersion: $($env:VERSION). Source: $($env:GITHUB_SHA).`n`n[Complete validation](https://github.com/ncosentino/curb/actions/runs/$($env:GITHUB_RUN_ID)) precedes publication. Download all eight nupkg assets into one local feed; SHA256SUMS records their exact bytes.`n`n[Installation and publication policy](https://github.com/ncosentino/curb/blob/main/docs/workflow/fork-maintenance.md). This is not an official Nullean distribution."
+          [IO.File]::WriteAllText($notes, $body)
+          gh release create "v$($env:VERSION)" --repo ncosentino/curb --target $env:GITHUB_SHA --draft --prerelease --latest=false --title "Curb fork $($env:VERSION)" --notes-file $notes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  base:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
+      - name: Build root, portable and MSBuild packages
+        run: |
+          test "$(dotnet --version)" = '10.0.303'
+          ./build.sh build -s true
+          ./build.sh generatepackages -s true
+      - name: Upload directly to the draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: ./build/distribution/Send-ReleasePackages.ps1 -PackageDirectory build/output -Set Base -Version $env:VERSION -ExpectedCommit $env:GITHUB_SHA
+
+  native:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: linux-arm64
+            os: ubuntu-24.04-arm
+          - rid: win-x64
+            os: windows-latest
+          - rid: win-arm64
+            os: windows-11-arm
+          - rid: osx-arm64
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
+      - name: Build and exercise the native CLI
+        shell: pwsh
+        env:
+          RID: ${{ matrix.rid }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($sdk -ne '10.0.303') { throw "Unexpected native SDK: $sdk" }
+          dotnet pack src/Nullean.Curb.Cli -c Release -r $env:RID -o build/output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $extension = if ($IsWindows) { '.exe' } else { '' }
+          $binary = Join-Path $PWD ".artifacts/publish/Nullean.Curb.Cli/release_$($env:RID)/curb$extension"
+          $identity = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or $identity -cne "$($env:VERSION)+$($env:GITHUB_SHA)") {
+            throw 'The native CLI has an unexpected version or source commit.'
+          }
+          $probe = Join-Path $env:RUNNER_TEMP 'release-probe.cs'
+          [IO.File]::WriteAllText($probe, 'class Probe{int Value=>1;}')
+          & $binary format $probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $binary check $probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload directly to the draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RID: ${{ matrix.rid }}
+          VERSION: ${{ inputs.version }}
+        run: ./build/distribution/Send-ReleasePackages.ps1 -PackageDirectory build/output -Set Native -RuntimeIdentifier $env:RID -Version $env:VERSION -ExpectedCommit $env:GITHUB_SHA
+
+  publish:
+    needs: [base, native]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
+      - name: Verify the complete release and publish it
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $tag = "v$($env:VERSION)"
+          $raw = gh release view $tag --repo ncosentino/curb --json isDraft,targetCommitish,assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $release = $raw | ConvertFrom-Json
+          if (-not $release.isDraft -or $release.targetCommitish -cne $env:GITHUB_SHA -or $release.assets.Count -ne 8) {
+            throw 'The draft does not contain exactly the expected release.'
+          }
+          $directory = Join-Path $env:RUNNER_TEMP 'release-packages'
+          gh release download $tag --repo ncosentino/curb --pattern '*.nupkg' --dir $directory
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packages = @(./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory $directory -Set Complete -Version $env:VERSION)
+          foreach ($package in $packages) {
+            $asset = @($release.assets | Where-Object name -CEQ $package.Name)
+            if ($asset.Count -ne 1 -or $asset[0].digest -cne "sha256:$($package.Sha256)" -or $asset[0].size -ne $package.Size) {
+              throw 'A downloaded release package failed digest verification.'
+            }
+          }
+          ./build/distribution/Test-PackageInstallation.ps1 -PackageDirectory $directory -Version $env:VERSION -ExpectedCommit $env:GITHUB_SHA -TestDirectory (Join-Path $env:RUNNER_TEMP 'release-consumer')
+          $checksums = Join-Path $directory 'SHA256SUMS'
+          [IO.File]::WriteAllLines($checksums, [string[]]@($packages | ForEach-Object { "$($_.Sha256)  $($_.Name)" }), [Text.UTF8Encoding]::new($false))
+          gh release upload $tag $checksums --repo ncosentino/curb
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $raw = gh release view $tag --repo ncosentino/curb --json isDraft,targetCommitish,assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $release = $raw | ConvertFrom-Json
+          $checksumAsset = @($release.assets | Where-Object name -CEQ 'SHA256SUMS')
+          $checksumHash = (Get-FileHash -LiteralPath $checksums).Hash.ToLowerInvariant()
+          if (-not $release.isDraft -or $release.targetCommitish -cne $env:GITHUB_SHA -or $release.assets.Count -ne 9 -or $checksumAsset.Count -ne 1 -or $checksumAsset[0].digest -cne "sha256:$checksumHash") {
+            throw 'The complete release or checksum manifest changed before publication.'
+          }
+          $refs = @(git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}")
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($refs.Count -gt 0) {
+            $peeled = @($refs | Where-Object { $_.EndsWith('^{}', [StringComparison]::Ordinal) })
+            $resolved = if ($peeled.Count -gt 0) { ($peeled[0] -split '\s+')[0] } else { ($refs[0] -split '\s+')[0] }
+            if ($resolved -cne $env:GITHUB_SHA) { throw 'The release tag points at another source commit.' }
+          }
+          gh release edit $tag --repo ncosentino/curb --draft=false --prerelease --latest=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release view $tag --repo ncosentino/curb --json url,tagName,isDraft
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

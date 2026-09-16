@@ -12,10 +12,11 @@
 **Fork contributor documentation:** [Contributing](docs/workflow/contributing.md),
 [agent guidance](docs/workflow/agent-guidance.md), and [fork maintenance](docs/workflow/fork-maintenance.md).
 
-**Fork artifacts:** this fork builds `ncosentino.curb-cli` and `ncosentino.curb`.
-They are distinct from the upstream packages shown below. Full validation runs retain
-downloadable packages for seven days; no public package registry publication is enabled.
-The fork's action entrypoint fails explicitly until a fork distribution is enabled; it never
+**Fork downloads:** [fork Releases](https://github.com/ncosentino/curb/releases) contain
+`ncosentino.curb-cli` and `ncosentino.curb`, distinct from the upstream packages shown below.
+CI retains no Actions artifacts. [Fork maintenance](docs/workflow/fork-maintenance.md)
+explains release installation and the separate NuGet.org authorization.
+The fork's action entrypoint fails explicitly until an action distribution is enabled; it never
 silently runs the upstream container instead of this source.
 
 <picture>
