@@ -480,20 +480,6 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
 
     printfn "rules: %s" (String.concat " " ownedIds)
 
-    if ownedIds |> Array.exists (fun id -> id = "IDE0047" || id = "IDE0048") then
-        let fixture = Path.Combine(work.FullName, "curb-cleanup-evidence")
-        Directory.CreateDirectory fixture |> ignore
-        File.WriteAllText(Path.Combine(fixture, "Directory.Build.props"), "<Project />")
-        File.WriteAllText(Path.Combine(fixture, "Directory.Packages.props"), "<Project />")
-        let project = Path.Combine(fixture, "CleanupEvidence.csproj")
-        File.WriteAllText(project,
-            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>")
-        File.WriteAllText(Path.Combine(fixture, ".editorconfig"),
-            "root = true\n[*.cs]\ndotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity\n")
-        File.WriteAllText(Path.Combine(fixture, "Parentheses.cs"),
-            "public static class Parentheses { public static int Remove() => ((1)); public static int Add(int a, int b, int c) => a + b * c; }\n")
-        exec "dotnet" ["sln"; work.FullName; "add"; project]
-
     // Frontend builds need npm, which a CI runner for a C# repository has no reason to have. Both npm
     // targets in docs-builder are Inputs/Outputs-gated, so writing their outputs makes MSBuild skip them.
     // If a future corpus needs something else the build fails loudly, which is the right way to find out.
@@ -648,6 +634,10 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
           "	private static Seed Create() => new Seed();"     // IDE0090
           ""
           "	public static Seed Make() => Create();"
+          ""
+          "	public static int RemoveParentheses() => ((1));"
+          ""
+          "	public static int AddParentheses(int a, int b, int c) => a + b * c;"
           "}"
           "" ]
         |> String.concat "\n"
