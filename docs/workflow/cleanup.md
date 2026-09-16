@@ -111,6 +111,17 @@ a directive needed only under another would be reported as unnecessary and then 
 | IDE0071 simplify interpolation | Drops a redundant `.ToString()` | Refused when the call takes arguments, to avoid silently losing the format. |
 | IDE0240 redundant `#nullable` | Removes the directive's line | Verified by `ContentVerifier` rather than `TokenStreamComparer`, since trivia is not in the token stream. |
 
+## Measured cleanup validation
+
+The [IDE0047 validation run](https://github.com/ncosentino/curb/actions/runs/35063886479)
+used SDK `10.0.303` and the pinned corpus plus its diagnostic seed. All 11 owned rules reported:
+410 distinct sites before cleanup, 406 resolved, and four explicitly declined using-directive
+sites remaining after a successful rebuild. No parentheses diagnostic remained. The adversarial
+safety corpus and per-case reference-style fixed points also passed.
+
+These measurements do not prove arbitrary semantic equivalence. Fresh build verdicts, conservative
+syntax gates, exact token allowances and explicit refusals remain required.
+
 ## Forwarding the remainder
 
 {{product}} is not a replacement for `dotnet format style`. With `--forward`, it names the remaining
