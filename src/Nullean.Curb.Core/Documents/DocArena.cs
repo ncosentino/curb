@@ -180,8 +180,9 @@ internal sealed class DocArena
 	public DocScope IndentIfBroken(ushort groupId, int levels = 1) =>
 		Open(new Doc(DocKind.Indent, b: levels, groupId: groupId));
 
-	/// <summary>Captures the current output column into <paramref name="register"/>.</summary>
-	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register));
+	/// <summary>Captures an output column, optionally resetting it when alignment crosses a blank line.</summary>
+	public void Anchor(int register, bool resetOnBlankLine = false) =>
+		Add(new Doc(DocKind.Anchor, a: register, b: resetOnBlankLine ? 1 : 0));
 
 	/// <summary>A hard break that indents to a column captured by <see cref="Anchor"/>.</summary>
 	public void AlignedLine(int register) =>

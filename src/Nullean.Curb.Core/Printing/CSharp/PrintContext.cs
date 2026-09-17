@@ -52,6 +52,9 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>True when a body was given braces the source did not have.</summary>
 	public bool BracesAdded { get; set; }
 
+	/// <summary>True when an eligible list was printed under an explicit trailing-comma policy.</summary>
+	public bool TrailingCommaPolicyApplied { get; set; }
+
 	/// <summary>
 	/// The group id of the parameter list most recently printed, or 0 before there is one.
 	/// </summary>

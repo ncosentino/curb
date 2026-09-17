@@ -80,7 +80,8 @@ public sealed class CSharpFormatter : IDisposable
 	/// Re-parse the output and compare token streams, catching the damage the content check cannot
 	/// see. Costs one extra parse — but only where the printer actually put a token boundary at
 	/// risk, which it tracks while laying the document out. On code that never closes a gap between
-	/// tokens this is free. Pass <c>true</c> to force it regardless.
+	/// tokens this is free. Trailing-comma policy application always requires a re-parse, even when
+	/// this parameter is false, because delimiter edits can violate the grammar without welding tokens.
 	/// </param>
 	/// <param name="produceText">
 	/// False for <c>check</c>, which only needs to know whether anything would change. Skipping the
@@ -131,20 +132,21 @@ public sealed class CSharpFormatter : IDisposable
 		var written = _output.Written;
 
 		if (!ContentVerifier.Verify(
-			source.AsSpan(), written, out var failure, context.ReorderedSpans, options.RewritesTrailingCommas,
+			source.AsSpan(), written, out var failure, context.ReorderedSpans, context.TrailingCommaPolicyApplied,
 			context.BracesAdded, context.NamespaceUnwrapped,
 			context.DroppedSpans, context.ArrowsAdded, HeaderFor(context, options)))
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
-		// The second parse only ever finds a moved token boundary, and the printer already knows
-		// whether it created that risk. Where it did not, the check is provably redundant.
+		// Delimiter edits can violate grammar without moving an existing token boundary.
+		// Other layout risks remain conditional on the caller's verification setting.
 		//
 		// ExpressionBodyAdded is intentionally absent: when a block body is converted to an expression
 		// body the dropped tokens are recorded in DroppedSpans (caught by ContentVerifier) and any
 		// adjacency risk from closing the gap is covered by _printer.RoundTripAtRisk. Running
 		// TokenStreamComparer unconditionally for every expression-body rewrite is redundant.
 		var reordered = context.ReorderedSpans is not null || context.BracesAdded || context.NamespaceUnwrapped;
-		verifyRoundTrip = verifyRoundTrip && (forceRoundTrip || reordered || _printer.RoundTripAtRisk);
+		verifyRoundTrip = context.TrailingCommaPolicyApplied
+			|| (verifyRoundTrip && (forceRoundTrip || reordered || _printer.RoundTripAtRisk));
 
 		var changed = !written.SequenceEqual(source.AsSpan());
 
@@ -162,7 +164,7 @@ public sealed class CSharpFormatter : IDisposable
 			if (!TokenStreamComparer.Verify(
 				parsed.Root, source.AsSpan(), text is not null ? text.AsSpan() : _output.Written, text,
 				out var roundTripFailure,
-				context.UsingsReordered, options.RewritesTrailingCommas, context.ModifiersReordered,
+				context.UsingsReordered, context.TrailingCommaPolicyApplied, context.ModifiersReordered,
 				context.BracesAdded, context.NamespaceUnwrapped, context.DroppedSpans, context.ArrowsAdded))
 				return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
 		}

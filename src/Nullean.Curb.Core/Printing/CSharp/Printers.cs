@@ -316,9 +316,8 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 		}
 
-		// A name keeps the token path, which reproduces the author's layout through trivia — some
-		// aliases target a generic spanning three lines, and the using-sort verifier compares the
-		// directive's text, so reformatting one makes it unrecognisable.
+		// Names keep the compact token path, including their content trivia. The using-sort verifier
+		// compares token boundaries independently of the whitespace this path normalises.
 		//
 		// Anything else goes to a real printer. Since C# 12 an alias can target any type, and Tokens
 		// is a raw token dump that only knows how to space a dotted name: it welded a tuple's element
@@ -2611,6 +2610,7 @@ internal static partial class Printers
 	/// </remarks>
 	internal static void PrintTrailingComma(PrintContext context)
 	{
+		context.TrailingCommaPolicyApplied = true;
 		var options = context.Options;
 		var arena = context.Arena;
 

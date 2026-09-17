@@ -382,7 +382,8 @@ internal static partial class Printers
 				if (chopAlways || (limit is { } elements && node.Expressions.Count > elements && !IsInsideArguments(node)))
 					arena.BreakParent();
 
-				var rewritesComma = RewritesTrailingComma(node.Expressions, node.CloseBraceToken, context);
+				var rewritesComma = !node.IsKind(SyntaxKind.ComplexElementInitializerExpression)
+					&& RewritesTrailingComma(node.Expressions, node.CloseBraceToken, context);
 
 				using (arena.Indent())
 				{

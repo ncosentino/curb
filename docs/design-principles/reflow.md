@@ -48,9 +48,9 @@ identical formatted output. In formal-methods terms it is closest to *confluence
 points reach the same normal form — or *canonicality*. Without a width, `csharp_keep_existing_linebreaks`
 reproduces the breaks the author chose, so the property does not hold; that is deliberate.
 
-**Current divergence:** some initializer and comment patterns can still feed output layout back into
-the next run. See [known limitations](../known-limitations.md). This is not a reason to weaken the
-first-pass fixed-point requirement.
+Initializer and trailing-comment anchor regressions have focused first-pass coverage. See
+[known limitations](../known-limitations.md) for the tested boundaries and remaining expression-body
+composition limitation. No exception weakens the first-pass fixed-point requirement.
 
 ## Writing layout rules
 
