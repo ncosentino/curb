@@ -76,4 +76,8 @@ if ($LASTEXITCODE -ne 3 -or [IO.File]::ReadAllText($source) -cne $beforeInvalid)
     throw 'An invalid rule file did not fail without changing source.'
 }
 [IO.File]::WriteAllText($policy, $policyText)
+& $Binary @PrefixArguments format --files $source
+if ($LASTEXITCODE -ne 0) { throw "Valid policy recovery failed: $LASTEXITCODE" }
+& $Binary @PrefixArguments check --files $source
+if ($LASTEXITCODE -ne 0) { throw "Recovered custom output is not a fixed point: $LASTEXITCODE" }
 'Custom layout installation and safety checks passed.'
