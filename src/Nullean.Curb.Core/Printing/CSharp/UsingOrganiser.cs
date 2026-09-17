@@ -208,7 +208,7 @@ internal static class UsingOrganiser
 	/// <c>.editorconfig</c> asked for sorting, and only over its using block.
 	/// </remarks>
 	private static string Name(UsingDirectiveSyntax directive) =>
-		directive.NamespaceOrType?.ToString() ?? string.Empty;
+		directive.Alias?.Name.Identifier.ValueText ?? directive.NamespaceOrType?.ToString() ?? string.Empty;
 
 	private static ReadOnlySpan<char> FirstSegment(UsingDirectiveSyntax directive)
 	{
