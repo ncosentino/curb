@@ -45,6 +45,11 @@ The reason is `csharp_preserve_single_line_blocks` and `csharp_preserve_single_l
 
 With `max_line_length` set and `csharp_keep_existing_linebreaks = false`, layout is intended to depend on tokens, options and width rather than inherited breaks. Implementation mistakes and composing syntax rewrites can still violate a fixed point. Measure the output and use [output-based layout decisions](reflow.md#writing-layout-rules) rather than treating the design as proof.
 
-## No invented keys
+## Standard options and explicit extensions
 
-{{product}} reads configuration from your `.editorconfig` and invents no keys. See [Working with existing tooling](existing-tooling.md) for the full key surface and how unrecognised keys are handled.
+{{product}} uses existing ecosystem keys for ordinary formatting preferences. See
+[Working with existing tooling](existing-tooling.md) for that surface.
+
+[Custom layout rules](custom-layout-rules.md) add one explicitly Curb-specific configuration
+reference, `curb_layout_rules`, for repository-owned syntax policies. This opt-in extension
+does not claim that other formatters understand the key.

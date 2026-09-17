@@ -29,14 +29,21 @@ internal sealed class CurbCommands
 	/// </param>
 	/// <param name="cache">-c, --cache, Skip files a previous run watched format to themselves.</param>
 	/// <param name="noVerify">Skip re-parsing output to prove the token stream is unchanged.</param>
+	/// <param name="layoutRules">Explicit repository rule file, or none to disable custom rules.</param>
+	/// <param name="layoutRulesBase">Logical base directory for a staged policy snapshot.</param>
+	/// <param name="layoutDependenciesFile">Write selected rule paths for MSBuild incrementality.</param>
 	public int Format(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
 		[Existing] FileInfo? msbuildListFile = null,
 		string? cache = null,
-		bool noVerify = false
+		bool noVerify = false,
+		string? layoutRules = null,
+		string? layoutRulesBase = null,
+		string? layoutDependenciesFile = null
 	) =>
-		FormattingRun.Execute(_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache).ExitCode;
+		FormattingRun.Execute(_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache,
+			layoutRulesPath: layoutRules, layoutRulesBase: layoutRulesBase, layoutDependenciesPath: layoutDependenciesFile).ExitCode;
 
 	/// <summary>Exit non-zero if anything would change.</summary>
 	/// <param name="path">A file or directory to check.</param>
@@ -53,6 +60,9 @@ internal sealed class CurbCommands
 	/// Write the paths that would change to this file, one per line. What the MSBuild integration reads
 	/// back to attach CURB0001 to each unformatted file instead of to the project.
 	/// </param>
+	/// <param name="layoutRules">Explicit repository rule file, or none to disable custom rules.</param>
+	/// <param name="layoutRulesBase">Logical base directory for a staged policy snapshot.</param>
+	/// <param name="layoutDependenciesFile">Write selected rule paths for MSBuild incrementality.</param>
 	public int Check(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
@@ -61,7 +71,10 @@ internal sealed class CurbCommands
 		bool noVerify = false,
 		bool expandUnhandled = false,
 		bool coverage = false,
-		FileInfo? unformattedListFile = null
+		FileInfo? unformattedListFile = null,
+		string? layoutRules = null,
+		string? layoutRulesBase = null,
+		string? layoutDependenciesFile = null
 	) =>
 		FormattingRun.Execute(
 			_fileSystem,
@@ -72,7 +85,10 @@ internal sealed class CurbCommands
 			coverageReport: coverage,
 			explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
 			cachePath: cache,
-			unformattedListPath: unformattedListFile?.FullName
+			unformattedListPath: unformattedListFile?.FullName,
+			layoutRulesPath: layoutRules,
+			layoutRulesBase: layoutRulesBase,
+			layoutDependenciesPath: layoutDependenciesFile
 		).ExitCode;
 
 	/// <summary>
@@ -103,6 +119,8 @@ internal sealed class CurbCommands
 	/// too, which is a no-op against Curb's own output, in exchange for loading the MSBuild workspace once
 	/// instead of twice.
 	/// </param>
+	/// <param name="layoutRules">Explicit repository rule file, or none to disable custom rules.</param>
+	/// <param name="layoutRulesBase">Logical base directory for a staged policy snapshot.</param>
 	public int Cleanup(
 		[Argument] string path = ".",
 		List<string>? sarifLogs = null,
@@ -110,9 +128,12 @@ internal sealed class CurbCommands
 		[Existing] FileInfo? msbuildListFile = null,
 		bool check = false,
 		bool forward = false,
-		bool noWhitespace = false
+		bool noWhitespace = false,
+		string? layoutRules = null,
+		string? layoutRulesBase = null
 	) =>
-		CleanupRun.Execute(_fileSystem, path, write: !check, logs: sarifLogs?.ToArray(), explicitFiles: ResolveExplicitFiles(files, msbuildListFile), forward: forward, separateWhitespace: noWhitespace);
+		CleanupRun.Execute(_fileSystem, path, write: !check, logs: sarifLogs?.ToArray(), explicitFiles: ResolveExplicitFiles(files, msbuildListFile), forward: forward, separateWhitespace: noWhitespace,
+			layoutRulesPath: layoutRules, layoutRulesBase: layoutRulesBase);
 
 	/// <summary>Show which code style rules Curb fixes, and which it does not.</summary>
 	/// <param name="cleanupIds">Print only the ids <c>curb cleanup</c> fixes, space separated, for scripting.</param>
@@ -162,7 +183,7 @@ internal sealed class CurbCommands
 	}
 
 	/// <summary>Show which .editorconfig keys Curb implements.</summary>
-	/// <param name="listKeys">Print only the implemented keys, space separated, for scripting.</param>
+	/// <param name="listKeys">Print implemented inline formatting keys, space separated, for scripting.</param>
 	public static int Options(bool listKeys = false)
 	{
 		// Driven by the catalog rather than a hand-written list, for the same reason `rules --cleanup-ids`
@@ -180,6 +201,9 @@ internal sealed class CurbCommands
 		Console.WriteLine($"# {keys.Length} key(s) implemented");
 		foreach (var key in keys)
 			Console.WriteLine($"  {key}");
+		Console.WriteLine("# file-backed configuration extensions");
+		foreach (var key in OptionCatalog.ConfigurationKeys.Order(StringComparer.Ordinal))
+			Console.WriteLine($"  {key}");
 
 		return 0;
 	}
@@ -189,10 +213,73 @@ internal sealed class CurbCommands
 	public int DocTree([Argument][Existing][FileExtensions(Extensions = "cs")] FileInfo path)
 	{
 		var full = _fileSystem.Path.GetFullPath(path.FullName);
-		var options = EditorConfigOptionsBinder.Bind(new CurbEditorConfig(_fileSystem).For(full));
-		using var formatter = new CSharpFormatter();
-		Console.WriteLine(formatter.DumpDocumentTree(_fileSystem.File.ReadAllText(full), options));
-		return 0;
+		try
+		{
+			var resolver = new CurbEditorConfig(_fileSystem);
+			var configuration = resolver.For(full);
+			var options = EditorConfigOptionsBinder.Bind(configuration);
+			var rules = new LayoutRuleLoader(_fileSystem, resolver).For(full, configuration);
+			using var formatter = new CSharpFormatter();
+			var source = _fileSystem.File.ReadAllText(full);
+			var result = formatter.Format(source, options, produceText: false, verifyRoundTrip: true, layoutRules: rules.Rules);
+			if (!result.Success)
+			{
+				Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(result.Message ?? "Document construction failed."));
+				return 3;
+			}
+			Console.WriteLine(formatter.DumpDocumentTree(source, options, rules.Rules));
+			return 0;
+		}
+		catch (Exception exception) when (exception is LayoutRuleConfigurationException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+		{
+			Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(
+				exception is LayoutRuleConfigurationException ? exception.Message : "Layout configuration paths are unavailable."));
+			return 3;
+		}
+	}
+
+	/// <summary>Explain the resolved repository policy and syntax matches without writing source.</summary>
+	/// <param name="path">The C# file to inspect.</param>
+	/// <param name="layoutRules">Explicit repository rule file, or none.</param>
+	/// <param name="layoutRulesBase">Logical base directory for a staged policy snapshot.</param>
+	public int ExplainLayout([Argument][Existing][FileExtensions(Extensions = "cs")] FileInfo path, string? layoutRules = null, string? layoutRulesBase = null)
+	{
+		var full = _fileSystem.Path.GetFullPath(path.FullName);
+		try
+		{
+			if (layoutRulesBase is not null && layoutRules is null)
+				throw new LayoutRuleConfigurationException("A layout rule base requires an explicit layout rule path.");
+			var resolver = new CurbEditorConfig(_fileSystem);
+			var configuration = resolver.For(full);
+			var options = EditorConfigOptionsBinder.Bind(configuration);
+			var policy = new LayoutRuleLoader(_fileSystem, resolver).For(full, configuration, layoutRules, layoutRulesBase);
+			Console.WriteLine($"policy = {policy.Path ?? "none"}");
+			Console.WriteLine($"base = {policy.BaseDirectory ?? "none"}");
+			Console.WriteLine($"fingerprint = {policy.Fingerprint:x32}");
+			var source = _fileSystem.File.ReadAllText(full);
+			if (options.Excluded || CSharpSource.HasGeneratedHeader(source))
+			{
+				Console.WriteLine("excluded = true");
+				return 0;
+			}
+			using var formatter = new CSharpFormatter();
+			var result = formatter.Format(source, options, produceText: false, verifyRoundTrip: true, layoutRules: policy.Rules);
+			if (!result.Success)
+			{
+				Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(result.Message ?? "Custom layout failed."));
+				return 3;
+			}
+			foreach (var application in result.LayoutApplications)
+				Console.WriteLine($"rule = {application.RuleId}; span = {application.Span.Start}:{application.Span.Length}; recipe = vertical-wrapper-chain");
+			Console.WriteLine($"matched = {result.LayoutApplications.Count}; would-change = {result.Changed}");
+			return 0;
+		}
+		catch (Exception exception) when (exception is LayoutRuleConfigurationException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+		{
+			Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(
+				exception is LayoutRuleConfigurationException ? exception.Message : "Layout configuration paths are unavailable."));
+			return 3;
+		}
 	}
 
 	/// <summary>Show the resolved options and any diagnostics for a file.</summary>
@@ -249,6 +336,21 @@ internal sealed class CurbCommands
 			{
 				Console.WriteLine(diagnostic.ToString());
 			}
+		}
+
+		Console.WriteLine();
+		Console.WriteLine($"{LayoutRuleLoader.Key} = {(config.Properties.TryGetValue(LayoutRuleLoader.Key, out var rulePath) ? rulePath : "none")}");
+		try
+		{
+			var resolver = new CurbEditorConfig(_fileSystem);
+			var policy = options.Excluded ? default : new LayoutRuleLoader(_fileSystem, resolver).For(full, config);
+			Console.WriteLine($"# layout policy: {policy.Path ?? "none"}; selected rules: {policy.Rules?.Rules.Count ?? 0}; fingerprint: {policy.Fingerprint:x32}");
+		}
+		catch (Exception exception) when (exception is LayoutRuleConfigurationException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+		{
+			Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(
+				exception is LayoutRuleConfigurationException ? exception.Message : "Layout configuration paths are unavailable."));
+			return 3;
 		}
 
 		return 0;

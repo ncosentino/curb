@@ -3,6 +3,7 @@ using System.Text;
 using AwesomeAssertions;
 using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Cli;
+using Nullean.Curb.Tests.LayoutRules;
 
 namespace Nullean.Curb.Tests.Cli;
 
@@ -21,6 +22,27 @@ public class CleanupRunTests
 		var fs = new MockFileSystem();
 		fs.AddFile($"{Root}/.editorconfig", new MockFileData(editorConfig));
 		return fs;
+	}
+
+	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void A_post_cleanup_layout_conflict_does_not_write_the_cleaned_fallback(bool write)
+	{
+		var fs = Repo("root=true\n[*.cs]\n" + LayoutRuleSamples.Config + "\ncurb_layout_rules=policy.json\n");
+		const string source = "class C { private int value; Task M() => TraceScope.RunAsync(async () => Outcome.CaptureAsync(async () => { return 1; })); }";
+		using var document = System.Text.Json.JsonDocument.Parse(LayoutRuleSamples.Policy);
+		var rule = document.RootElement.GetProperty("rules")[0].GetRawText();
+		var policy = "{\"schemaVersion\":1,\"rules\":[" + rule.Replace("\"wrappers\"", "\"one\"", StringComparison.Ordinal) + "," + rule.Replace("\"wrappers\"", "\"two\"", StringComparison.Ordinal) + "]}";
+		fs.AddFile($"{Root}/policy.json", new MockFileData(policy));
+		fs.AddFile($"{Root}/Source.cs", new MockFileData(source));
+		var offset = source.IndexOf("value;", StringComparison.Ordinal);
+		fs.AddFile($"{Root}/curb.sarif", new MockFileData($"{Root}/Source.cs(1,{offset + 1}): warning IDE0044: Make field readonly [sample.csproj]\n"));
+		var time = new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+		fs.File.SetLastWriteTimeUtc($"{Root}/Source.cs", time);
+		fs.File.SetLastWriteTimeUtc($"{Root}/curb.sarif", time.AddMinutes(1));
+		CleanupRun.Execute(fs, Root, write).Should().Be(3);
+		fs.File.ReadAllText($"{Root}/Source.cs").Should().Be(source);
 	}
 
 	[Test]

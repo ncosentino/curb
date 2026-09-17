@@ -1,0 +1,13 @@
+root = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+max_line_length = 120
+csharp_keep_existing_linebreaks = false
+csharp_wrap_parameters_style = chop_always
+csharp_wrap_before_declaration_rpar = true
+csharp_wrap_before_first_method_call = true
+curb_layout_rules = .curb-layout.json
+dotnet_diagnostic.IDE0055.severity = error

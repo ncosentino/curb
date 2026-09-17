@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Documents;
+using Nullean.Curb.LayoutRules;
 
 namespace Nullean.Curb.Printing.CSharp;
 
@@ -20,6 +21,12 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	public SourceText Text { get; } = text;
 
 	public FormatOptions Options { get; } = options;
+
+	public LayoutRuleSet? LayoutRules { get; init; }
+	public List<LayoutRuleApplication>? LayoutApplications { get; private set; }
+
+	public void AppliedLayout(string id, TextSpan span) =>
+		(LayoutApplications ??= []).Add(new LayoutRuleApplication(id, span));
 
 	/// <summary>Tokens emitted by a printer that understands them.</summary>
 	/// <summary>

@@ -102,18 +102,37 @@
            log, so two inner builds of a multi-targeting project cannot write over each other. Set
            Curb_Cache to false to build without one. -->
       <Curb_CacheFile Condition="'$(Curb_CacheFile)' == ''">$(IntermediateOutputPath)curb.cache</Curb_CacheFile>
+      <Curb_LayoutDependenciesFile Condition="'$(Curb_LayoutDependenciesFile)' == ''">$(IntermediateOutputPath)curb.layout-files</Curb_LayoutDependenciesFile>
+      <Curb_LayoutSettingsFile Condition="'$(Curb_LayoutSettingsFile)' == ''">$(IntermediateOutputPath)curb.layout-settings</Curb_LayoutSettingsFile>
 
       <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
            See the package project for why this is not a per-RID native binary. Curb_Exe overrides it
            with a native one, which starts in about a hundredth of the time. -->
       <Curb_Dll Condition="'$(Curb_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/curb.dll</Curb_Dll>
     </PropertyGroup>
+    <ItemGroup>
+      <_CurbLayoutInputs Remove="@(_CurbLayoutInputs)" />
+      <_CurbMissingLayoutInputs Remove="@(_CurbMissingLayoutInputs)" />
+    </ItemGroup>
+    <ReadLinesFromFile File="$(Curb_LayoutDependenciesFile)" Condition="Exists('$(Curb_LayoutDependenciesFile)')">
+      <Output TaskParameter="Lines" ItemName="_CurbLayoutInputs" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <_CurbLayoutInputs Include="$(Curb_LayoutRules)" Condition="'$(Curb_LayoutRules)' != '' and '$(Curb_LayoutRules)' != 'none'" />
+      <_CurbMissingLayoutInputs Include="@(_CurbLayoutInputs)" Condition="!Exists('%(_CurbLayoutInputs.Identity)')" />
+    </ItemGroup>
+    <Delete Files="$(Curb_StampFile)"
+            Condition="'$(Curb_Bypass)' != 'true' and (!Exists('$(Curb_LayoutDependenciesFile)') or '@(_CurbMissingLayoutInputs)' != '')" />
+    <WriteLinesToFile File="$(Curb_LayoutSettingsFile)"
+                      Lines="rules=$(Curb_LayoutRules);base=$(Curb_LayoutRulesBase)"
+                      Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Condition="'$(Curb_Bypass)' != 'true'" />
   </Target>
 
   <Target Name="Curb"
           BeforeTargets="CoreCompile"
           DependsOnTargets="CurbPrepare"
-          Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"
+          Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath);@(_CurbLayoutInputs);$(Curb_LayoutDependenciesFile);$(Curb_LayoutSettingsFile)"
           Outputs="$(Curb_StampFile)"
           Condition="'$(Curb_Bypass)' != 'true'
                      and '$(DesignTimeBuild)' != 'true'
@@ -169,12 +188,16 @@
       <_CurbInvocation Condition="'$(Curb_Exe)' != ''">&quot;$(Curb_Exe)&quot;</_CurbInvocation>
       <_CurbInvocation Condition="'$(Curb_Exe)' == ''">&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(Curb_Dll)&quot;</_CurbInvocation>
       <_CurbCacheArg Condition="'$(Curb_Cache)' != 'false' and '$(Curb_CacheFile)' != ''">--cache &quot;$(Curb_CacheFile)&quot;</_CurbCacheArg>
+      <_CurbLayoutRulesArg></_CurbLayoutRulesArg>
+      <_CurbLayoutBaseArg></_CurbLayoutBaseArg>
+      <_CurbLayoutRulesArg Condition="'$(Curb_LayoutRules)' != ''">--layout-rules &quot;$(Curb_LayoutRules)&quot;</_CurbLayoutRulesArg>
+      <_CurbLayoutBaseArg Condition="'$(Curb_LayoutRulesBase)' != ''">--layout-rules-base &quot;$(Curb_LayoutRulesBase)&quot;</_CurbLayoutBaseArg>
 
       <!-- Only `check` reads this back; a `format` run leaves nothing unformatted to name. -->
       <_CurbUnformattedArg Condition="'$(_CurbCommand)' == 'check'">--unformatted-list-file &quot;$(Curb_UnformattedFile)&quot;</_CurbUnformattedArg>
     </PropertyGroup>
 
-    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg) $(_CurbUnformattedArg)"
+    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg) $(_CurbUnformattedArg) $(_CurbLayoutRulesArg) $(_CurbLayoutBaseArg) --layout-dependencies-file &quot;$(Curb_LayoutDependenciesFile)&quot;"
           StandardOutputImportance="$(Curb_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">
@@ -225,7 +248,7 @@
     <Touch Condition="'$(_CurbExitCode)' == '0'" Files="$(Curb_StampFile)" AlwaysCreate="true" />
 
     <ItemGroup>
-      <FileWrites Include="$(Curb_StampFile);$(Curb_FileList);$(Curb_CacheFile);$(Curb_UnformattedFile)" />
+      <FileWrites Include="$(Curb_StampFile);$(Curb_FileList);$(Curb_CacheFile);$(Curb_UnformattedFile);$(Curb_LayoutDependenciesFile);$(Curb_LayoutSettingsFile)" />
     </ItemGroup>
   </Target>
 

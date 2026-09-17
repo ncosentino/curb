@@ -41,6 +41,11 @@ That input forces the complete corpus and platform matrix, even if `full` is fal
 all validation jobs succeed does the separate `Fork prerelease` workflow receive release-write
 permissions. Ordinary pushes and pull requests cannot enter that path.
 
+An optional `release_version` pins the prerelease version for every validation and packaging
+job through `MinVerVersionOverride`. Use a new version above the published package versions;
+branch-height versions alone need not increase across merged histories. Leaving it empty
+retains MinVer selection. Published versions are never replaced.
+
 The release workflow rebuilds the exact validated commit and pins its package version with
 `MinVerVersionOverride`. Its jobs upload directly to a draft release, not to Actions artifact
 storage. The final job requires all eight package identities, matching versions and SHA-256

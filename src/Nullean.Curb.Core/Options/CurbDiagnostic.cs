@@ -13,6 +13,10 @@ public enum DiagnosticSeverity
 /// <param name="Message">Human-readable text, already including the offending key or value.</param>
 public readonly record struct CurbDiagnostic(string Id, DiagnosticSeverity Severity, string Message)
 {
+	/// <summary>A repository layout policy could not be loaded or applied safely.</summary>
+	public static CurbDiagnostic LayoutRuleFailure(string reason) =>
+		new("CURB1008", DiagnosticSeverity.Error, reason);
+
 	/// <summary>A recognised key whose value Curb could not parse. The default is kept.</summary>
 	public static CurbDiagnostic UnrecognisedValue(string key, string value, string expected) =>
 		new("CURB1001", DiagnosticSeverity.Warning,

@@ -19,6 +19,11 @@ explains release installation and the separate NuGet.org authorization.
 The fork's action entrypoint fails explicitly until an action distribution is enabled; it never
 silently runs the upstream container instead of this source.
 
+**Repository-specific layouts:** [custom layout rules](docs/design-principles/custom-layout-rules.md)
+let a repository select declaration-aligned callback wrappers through a data-only rule pack.
+Method names stay in consumer configuration, callback bodies still receive normal formatting,
+and no source pragmas are required.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup.svg"/>
   <img src="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup-light.svg" alt="curb" width="176" height="96"/>

@@ -14,6 +14,10 @@ on:
         description: Run complete validation and publish a fork prerelease without Actions artifacts
         type: boolean
         default: false
+      release_version:
+        description: Optional explicit prerelease version; empty uses MinVer
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,6 +30,7 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CORPUS_COMMIT: 0c8c5868f3b41c6464095d55f7b020e2713375ba
+  MinVerVersionOverride: ${{ inputs.release_version }}
 
 jobs:
   preview-unions:
@@ -141,6 +146,14 @@ jobs:
         run: |
           dotnet pack src/Nullean.Curb.Cli -c Release -r $env:RID -o build/output
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise repository-owned rules on the native CLI
+        shell: pwsh
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          $extension = if ($IsWindows) { '.exe' } else { '' }
+          $binary = Join-Path $PWD ".artifacts/publish/Nullean.Curb.Cli/release_$($env:RID)/curb$extension"
+          ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $binary -TestDirectory (Join-Path $env:RUNNER_TEMP 'native-layout-rules')
 
   packages:
     if: github.repository == 'ncosentino/curb' && (inputs.full || inputs.publish_release)
@@ -172,6 +185,9 @@ jobs:
           $packages = @(./build/distribution/Get-ReleasePackages.ps1 -PackageDirectory build/output -Set Local)
           $version = $packages[0].Version
           ./build/distribution/Test-PackageInstallation.ps1 -PackageDirectory build/output -Version $version -ExpectedCommit $env:GITHUB_SHA -TestDirectory (Join-Path $env:RUNNER_TEMP 'package-consumer')
+          $binary = Join-Path $env:RUNNER_TEMP 'package-consumer' 'tool' 'curb'
+          $config = Join-Path $env:RUNNER_TEMP 'package-consumer' 'NuGet.Config'
+          ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $binary -TestDirectory (Join-Path $env:RUNNER_TEMP 'packaged-layout-rules') -PackageVersion $version -NuGetConfig $config
           "version=$version" >> $env:GITHUB_OUTPUT
 
   corpus:

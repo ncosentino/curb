@@ -69,5 +69,7 @@ coding agent never spends context on brace placement and never has to be told yo
 - [Contributing to this fork](workflow/contributing.md), [repository guidance](workflow/agent-guidance.md),
   [documentation development](workflow/documentation.md), and [fork maintenance](workflow/fork-maintenance.md).
 - [Architecture decisions](adr/index.md).
+- [Custom layout rules](design-principles/custom-layout-rules.md) — repository-owned
+  syntax/layout policies without source annotations.
 
 The site navigation in `_docset.yml` includes the maintained pages and generated reference listing.
