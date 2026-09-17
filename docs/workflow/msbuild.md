@@ -65,6 +65,10 @@ dotnet build -p:Curb_Check=true               # check without rewriting
 | `Curb_CacheFile` | `$(IntermediateOutputPath)curb.cache` | Where that cache lives. |
 | `Curb_FileList` | `$(IntermediateOutputPath)curb.files` | The compile set handed to the CLI. |
 | `Curb_UnformattedFile` | `$(IntermediateOutputPath)curb.unformatted` | The paths `check` reports back as unformatted, one per line — what the target reads to attach CURB0001 to each of them. |
+| `Curb_LayoutRules` | *unset* | Explicit rule-pack path or `none`, overriding the EditorConfig selection. |
+| `Curb_LayoutRulesBase` | the rule file's directory | Logical directory for file filters when using a policy snapshot. |
+| `Curb_LayoutDependenciesFile` | `$(IntermediateOutputPath)curb.layout-files` | Selected policy paths recorded by the CLI and included in target inputs. |
+| `Curb_LayoutSettingsFile` | `$(IntermediateOutputPath)curb.layout-settings` | Change-tracked explicit policy/base settings. |
 
 ## Diagnostics
 
@@ -79,12 +83,16 @@ There are two layers, and the first one matters more.
 
 ### Defence 1 — MSBuild stamp
 
-The target declares `Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"` against an
-output stamp. When none of those changed, MSBuild skips the target entirely — no process start, no
-directory walk, no file reads.
+The target includes compile items, EditorConfig files, the project, selected layout policies
+and explicit layout settings in its input set. When none change, MSBuild skips the formatter
+process. The prepare target reads the small policy dependency manifest and compares settings.
 
 The project file is an input because changing it can change which files are compiled. `.editorconfig`
 files are inputs because changing one changes the answer for every file they govern.
+
+A [custom rule](../design-principles/custom-layout-rules.md) edit invalidates both the stamp
+and content-based formatter cache. A missing dependency invalidates the stamp so an invalid
+policy cannot be hidden behind an earlier successful build.
 
 This is the common case on every build after the first.
 

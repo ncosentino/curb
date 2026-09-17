@@ -34,6 +34,14 @@ internal static class Fingerprint
 		return ReadDigest(digest);
 	}
 
+	internal static UInt128 Combine(UInt128 options, UInt128 layoutRules)
+	{
+		if (layoutRules == default)
+			return options;
+		Span<UInt128> values = [options, layoutRules];
+		return OfContent(MemoryMarshal.AsBytes(values));
+	}
+
 	/// <summary>Hashes the resolved <c>.editorconfig</c> properties a file's options were bound from.</summary>
 	/// <remarks>
 	/// The raw properties, deliberately, and not the bound <see cref="FormatOptions"/>. Two reasons, and

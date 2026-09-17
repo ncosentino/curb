@@ -19,6 +19,12 @@ namespace Nullean.Curb.Options;
 /// </remarks>
 public static class OptionCatalog
 {
+	/// <summary>The repository-owned rule-pack reference handled by the configuration layer.</summary>
+	public const string LayoutRulesKey = "curb_layout_rules";
+
+	/// <summary>Implemented file-backed configuration keys, separate from inline formatting values.</summary>
+	public static readonly FrozenSet<string> ConfigurationKeys = new[] { LayoutRulesKey }.ToFrozenSet(StringComparer.Ordinal);
+
 	/// <summary>Core EditorConfig keys, all of which Curb honours.</summary>
 	public static readonly FrozenSet<string> CoreKeys = new[]
 	{
@@ -214,9 +220,9 @@ public static class OptionCatalog
 		]).ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>True for a key Curb knows about, whether or not it is implemented yet.</summary>
-	public static bool IsKnown(string key) => CoreKeys.Contains(key) || FormattingKeys.Contains(key);
+	public static bool IsKnown(string key) => CoreKeys.Contains(key) || FormattingKeys.Contains(key) || ConfigurationKeys.Contains(key);
 
-	public static bool IsImplemented(string key) => ImplementedKeys.Contains(key);
+	public static bool IsImplemented(string key) => ImplementedKeys.Contains(key) || ConfigurationKeys.Contains(key);
 
 	/// <summary>
 	/// True for keys that belong to .NET code style but are not formatting, so Curb should ignore
@@ -238,7 +244,7 @@ public static class OptionCatalog
 		string? best = null;
 		var bestDistance = int.MaxValue;
 
-		foreach (var candidate in FormattingKeys.Concat(CoreKeys))
+		foreach (var candidate in FormattingKeys.Concat(CoreKeys).Concat(ConfigurationKeys))
 		{
 			var distance = Levenshtein(key, candidate, bestDistance);
 			if (distance >= bestDistance)

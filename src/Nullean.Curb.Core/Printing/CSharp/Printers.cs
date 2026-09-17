@@ -514,27 +514,11 @@ internal static partial class Printers
 
 	public static void MethodDeclaration(MethodDeclarationSyntax node, PrintContext context)
 	{
+		if (context.LayoutRules is not null && TryPrintLayoutMethod(node, context))
+			return;
+
+		PrintMethodHeader(node, context);
 		var arena = context.Arena;
-
-		PrintAttributeLists(node.AttributeLists, context);
-		PrintModifiers(node.Modifiers, context);
-		Node.Print(node.ReturnType, context);
-		arena.Synthetic(SyntheticText.Space);
-
-		if (node.ExplicitInterfaceSpecifier is not null)
-			Tokens(node.ExplicitInterfaceSpecifier, context);
-
-		TokenPrinter.Print(node.Identifier, context);
-		if (node.TypeParameterList is not null)
-			Node.Print(node.TypeParameterList, context);
-
-		Spacing.BeforeDeclarationParens(context);
-		Node.Print(node.ParameterList, context);
-
-		foreach (var constraint in node.ConstraintClauses)
-		{
-			PrintConstraintClause(constraint, context);
-		}
 
 		if (node.Body is not null)
 		{
@@ -550,6 +534,35 @@ internal static partial class Printers
 		}
 
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
+	}
+
+	private static void PrintMethodHeader(MethodDeclarationSyntax node, PrintContext context, bool customLayout = false)
+	{
+		var arena = context.Arena;
+
+		PrintAttributeLists(node.AttributeLists, context);
+		PrintModifiers(node.Modifiers, context);
+		Node.Print(node.ReturnType, context);
+		arena.Synthetic(SyntheticText.Space);
+
+		if (node.ExplicitInterfaceSpecifier is not null)
+			Tokens(node.ExplicitInterfaceSpecifier, context);
+
+		TokenPrinter.Print(node.Identifier, context);
+		if (node.TypeParameterList is not null)
+			Node.Print(node.TypeParameterList, context);
+
+		Spacing.BeforeDeclarationParens(context);
+		if (customLayout)
+			ParameterList(node.ParameterList, context, wrapBeforeClose: false);
+		else
+			Node.Print(node.ParameterList, context);
+
+		foreach (var constraint in node.ConstraintClauses)
+		{
+			PrintConstraintClause(constraint, context);
+		}
+
 	}
 
 	public static void ArrowExpressionClause(ArrowExpressionClauseSyntax node, PrintContext context)
@@ -702,7 +715,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.Identifier, context);
 	}
 
-	public static void ParameterList(ParameterListSyntax node, PrintContext context)
+	public static void ParameterList(ParameterListSyntax node, PrintContext context, bool? wrapBeforeClose = null)
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
@@ -741,7 +754,7 @@ internal static partial class Printers
 				// csharp_wrap_before_declaration_rpar takes the decision away from both the author and
 				// reflow when it is set: a breakable line puts the `)` on its own whenever the list
 				// breaks, and the plain spacing keeps it beside the last parameter whatever happens.
-				var rpar = context.Options.WrapBeforeDeclarationRpar;
+				var rpar = wrapBeforeClose ?? context.Options.WrapBeforeDeclarationRpar;
 				if (rpar == true || (rpar is null && !asWritten))
 					Spacing.InsideDeclarationParensBreakable(context);
 				else if (rpar == false)
@@ -778,12 +791,12 @@ internal static partial class Printers
 		Node.Print(node.Default, context);
 	}
 
-	public static void Block(BlockSyntax node, PrintContext context)
+	public static void Block(BlockSyntax node, PrintContext context, bool customLayout = false)
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
-		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
+		using (arena.Indent(customLayout || context.Options.IndentBlockContents ? 1 : 0))
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
 			StatementSyntax? previousStatement = null;
@@ -864,7 +877,7 @@ internal static partial class Printers
 			}
 		}
 
-		using (arena.IndentIf(context.Options.IndentBraces))
+		using (arena.IndentIf(!customLayout && context.Options.IndentBraces))
 		{
 			arena.HardLine(DocFlags.Reindent);
 			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
@@ -1386,34 +1399,9 @@ internal static partial class Printers
 	/// </remarks>
 	internal static bool TryPrintExpressionBody(BlockSyntax body, ExpressionBodyStyle style, PrintContext context)
 	{
-		if (style == ExpressionBodyStyle.AsWritten || body.Statements.Count != 1)
+		if (!TryGetExpressionBody(body, style, context, out var value, out var throws))
 			return false;
-
-		// Asked of the source, which reflow cannot move. Asking whether the result fits would let one
-		// run's width decide the next run's tokens.
-		//
-		// With csharp_keep_existing_linebreaks off there is no source layout to ask, and the answer
-		// becomes "decline" — when_on_single_line rewrites nothing in deterministic mode. It has to be
-		// that way round rather than "rewrite everything": run 1 would join a block that fits, run 2
-		// would then see a single-line block and turn it into an arrow. Reported; see CURB1004.
-		if (style == ExpressionBodyStyle.WhenOnSingleLine && !context.AuthorJoined(body.SpanStart, body.Span.End))
-			return false;
-
 		var statement = body.Statements[0];
-		var throws = statement is ThrowStatementSyntax { Expression: not null };
-
-		ExpressionSyntax? value = statement switch
-		{
-			ReturnStatementSyntax { Expression: { } returned } => returned,
-			ExpressionStatementSyntax expression => expression.Expression,
-			_ => null,
-		};
-
-		if (value is null && !throws)
-			return false;
-
-		if (HasAnyTrivia(body.OpenBraceToken) || HasAnyTrivia(body.CloseBraceToken) || HasAnyTrivia(statement, context))
-			return false;
 
 		var arena = context.Arena;
 
@@ -1427,6 +1415,7 @@ internal static partial class Printers
 		if (!arrowLeadsTheBody)
 			arena.Synthetic(SyntheticText.Arrow);
 
+		BeginExpressionBodyRewrite(body, context);
 		using (arena.Group())
 		using (arena.Indent())
 		{
@@ -1450,15 +1439,40 @@ internal static partial class Printers
 			}
 		}
 
+		context.Dropped(body.CloseBraceToken.Span);
+		return true;
+	}
+
+	private static bool TryGetExpressionBody(BlockSyntax body, ExpressionBodyStyle style, PrintContext context, out ExpressionSyntax? value, out bool throws)
+	{
+		value = null;
+		throws = false;
+		if (style == ExpressionBodyStyle.AsWritten || body.Statements.Count != 1)
+			return false;
+		if (style == ExpressionBodyStyle.WhenOnSingleLine && !context.AuthorJoined(body.SpanStart, body.Span.End))
+			return false;
+		var statement = body.Statements[0];
+		throws = statement is ThrowStatementSyntax { Expression: not null };
+		value = statement switch
+		{
+			ReturnStatementSyntax { Expression: { } returned } => returned,
+			ExpressionStatementSyntax expression => expression.Expression,
+			_ => null,
+		};
+		return (value is not null || throws)
+			&& !HasAnyTrivia(body.OpenBraceToken)
+			&& !HasAnyTrivia(body.CloseBraceToken)
+			&& !HasAnyTrivia(statement, context);
+	}
+
+	private static void BeginExpressionBodyRewrite(BlockSyntax body, PrintContext context)
+	{
 		// In source order: the verifier walks these with a single cursor.
 		context.Dropped(body.OpenBraceToken.Span);
-		if (statement is ReturnStatementSyntax returnStatement)
+		if (body.Statements[0] is ReturnStatementSyntax returnStatement)
 			context.Dropped(returnStatement.ReturnKeyword.Span);
-		context.Dropped(body.CloseBraceToken.Span);
-
 		context.ArrowsAdded++;
 		context.ExpressionBodyAdded = true;
-		return true;
 	}
 
 	/// <summary>

@@ -1,4 +1,5 @@
 using Nullean.Curb.Documents;
+using Nullean.Curb.LayoutRules;
 using Nullean.Curb.Printing;
 using Nullean.Curb.Printing.CSharp;
 using Nullean.Curb.Verification;
@@ -35,6 +36,9 @@ public readonly record struct FormatResult(
 	string? Message)
 {
 	public bool Success => Status == FormatStatus.Formatted;
+
+	/// <summary>Custom rule applications, with spans in the original source.</summary>
+	public IReadOnlyList<LayoutRuleApplication> LayoutApplications { get; init; } = [];
 }
 
 /// <summary>
@@ -87,6 +91,10 @@ public sealed class CSharpFormatter : IDisposable
 	/// False for <c>check</c>, which only needs to know whether anything would change. Skipping the
 	/// string keeps an unchanged file allocation-free on the output side.
 	/// </param>
+	/// <param name="layoutRules">
+	/// Immutable rules selected by the caller. Matching forces token verification; unsafe or
+	/// conflicting matches fail without output. Core does not load configuration files.
+	/// </param>
 	public FormatResult Format(
 		string source,
 		in FormatOptions options,
@@ -94,7 +102,8 @@ public sealed class CSharpFormatter : IDisposable
 		bool produceText = true,
 		bool expandUnhandled = false,
 		bool verifyRoundTrip = false,
-		bool forceRoundTrip = false)
+		bool forceRoundTrip = false,
+		LayoutRuleSet? layoutRules = null)
 	{
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 		{
@@ -112,6 +121,7 @@ public sealed class CSharpFormatter : IDisposable
 			ExpandUnhandled = expandUnhandled,
 			UnhandledByKind = UnhandledByKind,
 			Suppressed = FormattingSuppression.Scan(parsed.Root, source.AsSpan()),
+			LayoutRules = layoutRules,
 		};
 
 		try
@@ -121,6 +131,10 @@ public sealed class CSharpFormatter : IDisposable
 		catch (PrintTooDeepException exception)
 		{
 			return new FormatResult(FormatStatus.TooDeep, false, null, context.Coverage, exception.Message);
+		}
+		catch (LayoutRuleException exception)
+		{
+			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, exception.Message);
 		}
 
 #if DEBUG
@@ -145,7 +159,7 @@ public sealed class CSharpFormatter : IDisposable
 		// adjacency risk from closing the gap is covered by _printer.RoundTripAtRisk. Running
 		// TokenStreamComparer unconditionally for every expression-body rewrite is redundant.
 		var reordered = context.ReorderedSpans is not null || context.BracesAdded || context.NamespaceUnwrapped;
-		verifyRoundTrip = context.TrailingCommaPolicyApplied
+		verifyRoundTrip = context.LayoutApplications is not null || context.TrailingCommaPolicyApplied
 			|| (verifyRoundTrip && (forceRoundTrip || reordered || _printer.RoundTripAtRisk));
 
 		var changed = !written.SequenceEqual(source.AsSpan());
@@ -174,7 +188,10 @@ public sealed class CSharpFormatter : IDisposable
 			changed,
 			text,
 			context.Coverage,
-			null);
+			null)
+		{
+			LayoutApplications = context.LayoutApplications?.AsReadOnly() ?? (IReadOnlyList<LayoutRuleApplication>)[],
+		};
 	}
 
 	/// <summary>The header text the printer wrote, or null when it did not touch the top of the file.</summary>
@@ -193,13 +210,13 @@ public sealed class CSharpFormatter : IDisposable
 	public void Dispose() => _output.Dispose();
 
 	/// <summary>Renders the document tree for a file, for debugging why it laid out the way it did.</summary>
-	public string DumpDocumentTree(string source, in FormatOptions options)
+	public string DumpDocumentTree(string source, in FormatOptions options, LayoutRuleSet? layoutRules = null)
 	{
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 			return $"# does not parse: {errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)}";
 
 		_arena.Reset(source.Length);
-		Node.Print(parsed.Root, new PrintContext(_arena, parsed.Text, options));
+		Node.Print(parsed.Root, new PrintContext(_arena, parsed.Text, options) { LayoutRules = layoutRules });
 		return DocDumper.Dump(_arena, source);
 	}
 }

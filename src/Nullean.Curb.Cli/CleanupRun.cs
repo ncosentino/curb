@@ -42,6 +42,8 @@ internal static class CleanupRun
 	/// Run <c>style</c> and <c>analyzers</c> as two invocations instead of one bare <c>dotnet format</c>,
 	/// from <c>--no-whitespace</c>.
 	/// </param>
+	/// <param name="layoutRulesPath">An explicit layout policy or none, overriding EditorConfig.</param>
+	/// <param name="layoutRulesBase">Logical directory for a policy snapshot.</param>
 	public static int Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -49,7 +51,9 @@ internal static class CleanupRun
 		string[]? logs = null,
 		string[]? explicitFiles = null,
 		bool forward = false,
-		bool separateWhitespace = false)
+		bool separateWhitespace = false,
+		string? layoutRulesPath = null,
+		string? layoutRulesBase = null)
 	{
 		logs = logs is { Length: > 0 } ? logs : Discover(fileSystem, target);
 
@@ -114,12 +118,30 @@ internal static class CleanupRun
 			.ToArray();
 
 		var editorConfig = new CurbEditorConfig(fileSystem);
+		var layoutLoader = new LayoutRuleLoader(fileSystem, editorConfig);
 
 		// Resolved on one thread up front, for the reason FormattingRun records: the parser is shared and
 		// is not thread-safe.
 		var options = new FormatOptions[work.Length];
-		for (var i = 0; i < work.Length; i++)
-			options[i] = EditorConfigOptionsBinder.Bind(editorConfig.For(work[i].Path));
+		var layouts = new ResolvedLayoutRules[work.Length];
+		try
+		{
+			if (layoutRulesBase is not null && layoutRulesPath is null)
+				throw new LayoutRuleConfigurationException("A layout rule base requires an explicit layout rule path.");
+			for (var i = 0; i < work.Length; i++)
+			{
+				var configuration = editorConfig.For(work[i].Path);
+				options[i] = EditorConfigOptionsBinder.Bind(configuration);
+				if (!options[i].Excluded)
+					layouts[i] = layoutLoader.For(work[i].Path, configuration, layoutRulesPath, layoutRulesBase);
+			}
+		}
+		catch (Exception exception) when (exception is LayoutRuleConfigurationException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+		{
+			Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(
+				exception is LayoutRuleConfigurationException ? exception.Message : "Layout configuration paths are unavailable."));
+			return 3;
+		}
 
 		var changed = 0;
 		var applied = 0;
@@ -196,6 +218,13 @@ internal static class CleanupRun
 					if (!result.Changed || result.Text is null)
 						return worker;
 
+					var formatted = worker.Formatter.Format(result.Text, options[index], produceText: true, verifyRoundTrip: true, layoutRules: layouts[index].Rules);
+					if (!formatted.Success || formatted.Text is null)
+					{
+						Interlocked.Increment(ref failed);
+						messages.Add($"{path}: post-cleanup formatting failed — {formatted.Message}");
+						return worker;
+					}
 					if (!write)
 					{
 						Interlocked.Increment(ref changed);
@@ -206,8 +235,7 @@ internal static class CleanupRun
 					// Formatted before it is written. A removed directive leaves the blank-line rules with an
 					// opinion, and leaving that to the next build would mean IDE0055 reported against Curb's
 					// own output — which is the one thing the formatter's placement exists to prevent.
-					var formatted = worker.Formatter.Format(result.Text, options[index], produceText: true, verifyRoundTrip: true);
-					var output = formatted.Success && formatted.Text is not null ? formatted.Text : result.Text;
+					var output = formatted.Text;
 
 					var wantsBom = options[index].Charset switch
 					{

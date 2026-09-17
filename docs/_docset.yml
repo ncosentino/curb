@@ -31,6 +31,7 @@ toc:
       - file: ai-native.md
       - file: existing-tooling.md
       - file: syntax-and-semantic.md
+      - file: custom-layout-rules.md
   - folder: workflow
     children:
       - file: integrations.md
@@ -46,6 +47,7 @@ toc:
       - file: index.md
       - file: 0001-agent-guidance-ownership.md
       - file: 0002-artifact-free-distribution.md
+      - file: 0003-repository-owned-layout-rules.md
   - folder: why-not
     children:
       - file: index.md

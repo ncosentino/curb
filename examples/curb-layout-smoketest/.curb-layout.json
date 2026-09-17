@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "smoke-wrappers",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "lambda-wrapper-chain",
+      "owner": "expression-bodied-method",
+      "calleeSyntax": ["TraceScope.RunAsync", "Outcome.CaptureAsync"],
+      "callbackArgument": "last",
+      "callbackParameters": "empty",
+      "terminalBody": "block",
+      "awaitTokens": "preserve"
+    },
+    "layout": {
+      "recipe": "vertical-wrapper-chain",
+      "anchor": "declaration",
+      "parameterClose": "with-last-parameter",
+      "arrowAndRootAwait": "with-header",
+      "wrapperIndent": 0,
+      "lambdaBraceIndent": 0,
+      "bodyIndent": 1,
+      "closeInvocations": "compact"
+    }
+  }]
+}

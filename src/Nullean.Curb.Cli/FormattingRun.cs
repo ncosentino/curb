@@ -4,6 +4,8 @@ using System.IO.Abstractions;
 using System.Text;
 using System.Threading.Channels;
 using Nullean.Curb.EditorConfig;
+using Nullean.Curb.LayoutRules;
+using Nullean.Curb.Options;
 
 namespace Nullean.Curb.Cli;
 
@@ -56,6 +58,9 @@ internal static class FormattingRun
 	/// each file that actually needs reformatting instead of to the project. Ignored when <paramref
 	/// name="write"/> is <see langword="true"/>: a format run leaves nothing unformatted to list.
 	/// </param>
+	/// <param name="layoutRulesPath">An explicit rule file or none, overriding EditorConfig.</param>
+	/// <param name="layoutRulesBase">Logical rule directory for a caller-supplied policy snapshot.</param>
+	/// <param name="layoutDependenciesPath">Optional MSBuild dependency manifest for selected rule files.</param>
 	public static FormattingRunSummary Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -65,7 +70,10 @@ internal static class FormattingRun
 		bool coverageReport = false,
 		string[]? explicitFiles = null,
 		string? cachePath = null,
-		string? unformattedListPath = null)
+		string? unformattedListPath = null,
+		string? layoutRulesPath = null,
+		string? layoutRulesBase = null,
+		string? layoutDependenciesPath = null)
 	{
 		// On by default for both commands: the printer tracks whether it actually put a token
 		// boundary at risk, so on code that does not, the second parse never happens.
@@ -101,6 +109,7 @@ internal static class FormattingRun
 		}
 
 		var editorConfig = new CurbEditorConfig(fileSystem);
+		var layoutLoader = new LayoutRuleLoader(fileSystem, editorConfig);
 
 		// Resolved per file, not per directory. A section can discriminate on the file name —
 		// `[*Tests.cs]`, `[Program.cs]`, and `generated_code = true` in particular — so reusing one
@@ -113,16 +122,43 @@ internal static class FormattingRun
 		// The options fingerprint has to be taken here for the same reason, and it is only taken at all
 		// when there is a cache to key. The path is absolutised for the cache alone, so the messages and
 		// the writes below still say whatever the caller asked for.
-		var work = new (string Path, FormatOptions Options, string CacheKey, UInt128 OptionsHash)[files.Length];
+		var work = new (string Path, FormatOptions Options, LayoutRuleSet? Rules, string CacheKey, UInt128 OptionsHash)[files.Length];
 		var fingerprinter = cache is null ? null : new OptionsFingerprinter();
-		for (var i = 0; i < files.Length; i++)
+		var configurationPaths = layoutDependenciesPath is null ? null : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		try
 		{
-			var configuration = editorConfig.For(files[i]);
-			work[i] = (
-				files[i],
-				EditorConfigOptionsBinder.Bind(configuration),
-				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
-				fingerprinter?.Of(configuration) ?? default);
+			if (layoutRulesBase is not null && layoutRulesPath is null)
+				throw new LayoutRuleConfigurationException("A layout rule base requires an explicit layout rule path.");
+			for (var i = 0; i < files.Length; i++)
+			{
+				var configuration = editorConfig.For(files[i]);
+				if (configurationPaths is not null)
+				{
+					foreach (var configFile in configuration.EditorConfigFiles)
+						configurationPaths.Add(fileSystem.Path.GetFullPath(fileSystem.Path.Combine(configFile.Directory, configFile.FileName)));
+				}
+				var options = EditorConfigOptionsBinder.Bind(configuration);
+				var layout = options.Excluded ? default : layoutLoader.For(files[i], configuration, layoutRulesPath, layoutRulesBase);
+				work[i] = (
+					files[i], options, layout.Rules,
+					cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
+					cache is null ? default : Fingerprint.Combine(fingerprinter!.Of(configuration), layout.Fingerprint));
+			}
+			if (layoutDependenciesPath is not null)
+			{
+				var outputPath = fileSystem.Path.GetFullPath(layoutDependenciesPath);
+				if (files.Any(path => string.Equals(fileSystem.Path.GetFullPath(path), outputPath, StringComparison.OrdinalIgnoreCase))
+					|| layoutLoader.Dependencies.Any(path => string.Equals(path, outputPath, StringComparison.OrdinalIgnoreCase))
+					|| configurationPaths!.Contains(outputPath))
+					throw new LayoutRuleConfigurationException("The dependency manifest cannot overwrite source or configuration input.");
+				layoutLoader.WriteDependencies(layoutDependenciesPath);
+			}
+		}
+		catch (Exception exception) when (exception is LayoutRuleConfigurationException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+		{
+			Console.Error.WriteLine(CurbDiagnostic.LayoutRuleFailure(
+				exception is LayoutRuleConfigurationException ? exception.Message : "Layout configuration or dependency paths are unavailable."));
+			return new FormattingRunSummary(files.Length, 0, 0, 0, 1, 0, 0, 0, 3);
 		}
 
 		var changed = 0;
@@ -146,7 +182,7 @@ internal static class FormattingRun
 		//
 		// The two hashes ride along because the reader has already computed the content one to ask the
 		// cache; recomputing it in the worker to record the answer would hash every file twice.
-		var channel = Channel.CreateBounded<(string Path, FormatOptions Options, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(
+		var channel = Channel.CreateBounded<(string Path, FormatOptions Options, LayoutRuleSet? Rules, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(
 			new BoundedChannelOptions(32) { SingleWriter = false, SingleReader = false });
 
 		// 4 reader tasks mirror the old gate width. Each races for the next index via an atomic
@@ -175,7 +211,7 @@ internal static class FormattingRun
 
 				// await WriteAsync so the thread is released (rather than blocked) when the channel
 				// is full; the reader backs off without pinning a thread-pool thread.
-				await channel.Writer.WriteAsync((item.Path, item.Options, bytes, item.CacheKey, contentHash, item.OptionsHash));
+				await channel.Writer.WriteAsync((item.Path, item.Options, item.Rules, bytes, item.CacheKey, contentHash, item.OptionsHash));
 			}
 		})).ToArray();
 
@@ -223,7 +259,7 @@ internal static class FormattingRun
 
 					var result = formatter.Format(
 						source, item.Options, fileSystem.Path.GetFileName(item.Path),
-						produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
+						produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip, layoutRules: item.Rules);
 
 					switch (result.Status)
 					{

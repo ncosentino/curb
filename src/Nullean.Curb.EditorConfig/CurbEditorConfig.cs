@@ -25,9 +25,39 @@ public sealed class CurbEditorConfig(IFileSystem fileSystem)
 	// settings. Fixed upstream; no workaround needed here any more.
 	private readonly EditorConfigParser _parser = new(fileSystem);
 	private readonly Dictionary<string, EditorConfigResolvedChain> _chains = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, GlobMatcher> _matchers = new(StringComparer.Ordinal);
 
 	/// <summary>Resolves the settings that apply to <paramref name="filePath"/>.</summary>
 	public FileConfiguration For(string filePath)
+	{
+		return _parser.Parse(filePath, Chain(filePath));
+	}
+
+	/// <summary>Finds the directory of the last matching section that declares a property.</summary>
+	/// <param name="filePath">The source file whose configuration is being resolved.</param>
+	/// <param name="property">A normalized EditorConfig property name.</param>
+	/// <returns>The declaring configuration directory, or null when no matching section declares the property.</returns>
+	public string? OriginDirectoryFor(string filePath, string property)
+	{
+		var fullPath = fileSystem.Path.GetFullPath(filePath);
+		var sections = Chain(fullPath).Sections;
+		for (var i = sections.Length - 1; i >= 0; i--)
+		{
+			var section = sections[i];
+			if (!section.ContainsKey(property))
+				continue;
+			if (!_matchers.TryGetValue(section.Glob, out var matcher))
+			{
+				matcher = GlobMatcher.Create(section.Glob, new GlobMatcherOptions { MatchBase = true, Dot = true, AllowWindowsPaths = true });
+				_matchers.Add(section.Glob, matcher);
+			}
+			if (matcher.IsMatch(fullPath))
+				return section.EditorConfigFile.Directory;
+		}
+		return null;
+	}
+
+	private EditorConfigResolvedChain Chain(string filePath)
 	{
 		var directory = Path.GetDirectoryName(filePath) ?? ".";
 		if (!_chains.TryGetValue(directory, out var chain))
@@ -35,6 +65,6 @@ public sealed class CurbEditorConfig(IFileSystem fileSystem)
 			chain = _parser.GetResolvedChainForDirectory(directory);
 			_chains[directory] = chain;
 		}
-		return _parser.Parse(filePath, chain);
+		return chain;
 	}
 }

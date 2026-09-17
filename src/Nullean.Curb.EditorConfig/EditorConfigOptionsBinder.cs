@@ -749,6 +749,12 @@ public static class EditorConfigOptionsBinder
 			if (OptionCatalog.IsOtherCodeStyleKey(key))
 				continue;
 
+			if (key.StartsWith("curb_", StringComparison.Ordinal))
+			{
+				diagnostics.Add(CurbDiagnostic.UnknownKey(key, OptionCatalog.Suggest(key)));
+				continue;
+			}
+
 			if (!key.StartsWith("csharp_", StringComparison.Ordinal) && !key.StartsWith("dotnet_", StringComparison.Ordinal))
 				continue;
 

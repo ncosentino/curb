@@ -19,7 +19,8 @@ That means the IDE and {{product}} agree out of the box. You do not have to choo
 
 {{product}} reads all 39 `csharp_*` and `dotnet_*` formatting keys from [IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055). If your team has configured indentation, spacing, brace placement, or blank lines in `.editorconfig`, {{product}} honours every one of those choices.
 
-A Prettier-style formatter reads a handful of keys and decides the rest itself. {{product}} invents nothing.
+A Prettier-style formatter reads a handful of keys and decides the rest itself. {{product}}
+uses the ecosystem's existing keys for these preferences.
 
 ## ReSharper and Rider keys
 
@@ -28,10 +29,11 @@ A Prettier-style formatter reads a handful of keys and decides the rest itself. 
 these keys, so a repository configured for Rider is already configured for {{product}} without touching
 anything.
 
-## No invented keys
+## Standard preferences and repository extensions
 
-{{product}} reads configuration from your `.editorconfig` and adds nothing to it. Every key it reads
-comes from either Microsoft's IDE0055 surface or JetBrains' ReSharper set.
+Ordinary formatting preferences come from Microsoft's IDE0055 surface or JetBrains'
+ReSharper set. [Repository-owned layout rules](custom-layout-rules.md) add one explicit
+Curb-specific configuration reference, `curb_layout_rules`; other formatters do not interpret it.
 
 Unrecognised keys are reported rather than silently ignored, with a "did you mean" suggestion for likely
 typos. The distinction between "not implemented" and "not known" is surfaced explicitly — a formatter
@@ -39,3 +41,6 @@ that silently drops a key you just added gives you no way to know it is not bein
 
 `curb print-config Foo.cs` prints every resolved option and its source. Worth running on a repository
 you are about to reformat.
+
+The `options` command's `--list-keys` mode lists inline formatting keys for conformance
+tooling. Its ordinary output also lists file-backed configuration extensions.
