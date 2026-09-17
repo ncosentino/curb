@@ -91,11 +91,15 @@ internal static class UsingOrganiser
 
 	/// <summary>True when a blank line belongs between these two directives.</summary>
 	/// <remarks>
-	/// A group is a run sharing a first namespace segment, which is only meaningful once the list is
-	/// sorted — hence <c>dotnet_separate_import_directive_groups</c> implying a sort.
+	/// Plain directives group by namespace segment. Static directives and aliases each form their
+	/// own group, independent of their targets' namespace segments.
 	/// </remarks>
-	public static bool StartsNewGroup(UsingDirectiveSyntax previous, UsingDirectiveSyntax next) =>
-		!FirstSegment(previous).Equals(FirstSegment(next), StringComparison.Ordinal);
+	public static bool StartsNewGroup(UsingDirectiveSyntax previous, UsingDirectiveSyntax next)
+	{
+		var rank = Rank(previous);
+		return rank != Rank(next)
+			|| (rank == 0 && !FirstSegment(previous).Equals(FirstSegment(next), StringComparison.Ordinal));
+	}
 
 	/// <summary>
 	/// Splits a file banner off the first directive's leading trivia.

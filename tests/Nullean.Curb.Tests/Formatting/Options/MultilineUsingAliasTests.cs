@@ -20,6 +20,7 @@ public class MultilineUsingAliasTests : FormattingTest
         """,
 		"""
         using System;
+
         using Alias = System.Collections.Generic.List<string>;
 
         namespace FormatterRepro;

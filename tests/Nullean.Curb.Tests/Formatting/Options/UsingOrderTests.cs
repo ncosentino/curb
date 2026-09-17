@@ -17,6 +17,30 @@ namespace Nullean.Curb.Tests.Formatting.Options;
 /// </remarks>
 public class UsingOrderTests : FormattingTest
 {
+	[Test]
+	public Task Static_directives_and_aliases_have_separate_namespace_independent_groups() => Formats(
+		"""
+		using System;
+		using static System.Math;
+		using static Microsoft.CSharp.RuntimeBinder.Binder;
+		using First = System.String;
+		using Second = Microsoft.CSharp.RuntimeBinder.CSharpArgumentInfo;
+
+		public class C { }
+		""",
+		"""
+		using System;
+
+		using static System.Math;
+		using static Microsoft.CSharp.RuntimeBinder.Binder;
+
+		using First = System.String;
+		using Second = Microsoft.CSharp.RuntimeBinder.CSharpArgumentInfo;
+
+		public class C { }
+		""",
+		"dotnet_sort_system_directives_first = true\ndotnet_separate_import_directive_groups = true");
+
 	private const string Unsorted = """
 		using Zebra.Things;
 		using System.Linq;
