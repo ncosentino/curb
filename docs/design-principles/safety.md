@@ -30,6 +30,15 @@ boundary. Where it did not, the check is skipped. That is a deliberate saving â€
 {{product}} does not need the unconditional re-parse that costs other formatters a second parse per
 file. See [Design principles](index.md) for the full reasoning.
 
+Applying a trailing-comma policy always reparses the output, including when a caller disables
+optional layout verification. Delimiter edits can violate C# grammar without welding adjacent
+tokens. Complex collection-element argument lists never receive a trailing comma; their outer
+collection initializer can still receive one.
+
+Sorted using directives are compared by exact token kinds/text and interior content trivia,
+not their original whitespace layout. Multiline aliases can therefore be joined without
+excusing changed names, targets, modifiers or comments.
+
 Inactive conditional branches are preserved as text, not independently formatted under every possible
 symbol set. A successful runtime verification also does not establish idempotency. The
 [known limitations](../known-limitations.md) remain defects even when content verification succeeds.

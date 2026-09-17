@@ -28,12 +28,15 @@ The accessor-level conversion fires on run 1. The property-level conversion only
 accessor list that already has an arrow getter, so it fires on run 2. Two rules that should compose
 in one pass currently do not.
 
-## Anchor columns feed back into the next run
+## Anchor regression boundaries
 
 The argument-list initializer case now anchors to the output group's line decision rather than the
 argument's original inline placement. It reaches the same indentation on the first and second pass,
 including when preservation is combined with a finite width.
 
-The broader historical report also mentions comment alignment without an isolated example.
-That comment-only case has not been established as fixed. New failures need a specific input,
-configuration and first/second output; do not assume that one corrected initializer covers all trivia.
+Trailing-comment anchors now reset to the enclosing indentation when the output introduces a
+blank line. A section comment after commented attributes no longer inherits the previous
+trailing-comment column on its first pass. Continuous comment runs retain their alignment.
+
+These fixes cover the reproduced initializer and attribute-comment cases, not every possible
+trivia arrangement. New failures still need a specific input, configuration and first/second output.

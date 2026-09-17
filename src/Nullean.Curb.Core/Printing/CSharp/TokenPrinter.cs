@@ -430,7 +430,7 @@ internal static class TokenPrinter
 					separated = false;
 
 					// Where this comment starts is where a comment on the next line aligns to.
-					context.Arena.Anchor(TrailingCommentAnchor);
+					context.Arena.Anchor(TrailingCommentAnchor, resetOnBlankLine: true);
 					EmitTriviaText(trivia, context, CommentFlags(trivia));
 
 					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))

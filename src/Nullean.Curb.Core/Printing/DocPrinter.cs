@@ -51,6 +51,7 @@ internal sealed class DocPrinter
 
 	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
 	private readonly int[] _anchors = new int[4];
+	private readonly bool[] _resetAnchorOnBlankLine = new bool[4];
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -85,6 +86,8 @@ internal sealed class DocPrinter
 		_lastSourceEnd = -1;
 		_insideLineComment = false;
 		RoundTripAtRisk = false;
+		Array.Clear(_anchors);
+		Array.Clear(_resetAnchorOnBlankLine);
 
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);
@@ -165,6 +168,7 @@ internal sealed class DocPrinter
 
 				case DocKind.Anchor:
 					_anchors[doc.A] = _column;
+					_resetAnchorOnBlankLine[doc.A] = doc.B != 0;
 					i++;
 					break;
 
@@ -408,6 +412,9 @@ internal sealed class DocPrinter
 			if (!_output.AtLineStart())
 				_output.Append(_endOfLine);
 
+			if (_resetAnchorOnBlankLine[doc.B] && EndsAfterBlankLine())
+				_anchors[doc.B] = _indenter.ColumnsFor(scope.Indent);
+
 			// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes,
 			// and the only way to land on a column no tab stop falls on while still honouring
 			// indent_style. Under `indent_style = space` the loop simply never fires.
@@ -432,6 +439,23 @@ internal sealed class DocPrinter
 		_output.Append(_indenter.For(scope.Indent));
 		_column = _indenter.ColumnsFor(scope.Indent);
 		_insideLineComment = false;
+	}
+
+	private bool EndsAfterBlankLine()
+	{
+		var written = _output.Written;
+		var endings = 0;
+		for (var i = written.Length - 1; i >= 0; i--)
+		{
+			if (written[i] == '\n')
+			{
+				if (++endings == 2)
+					return true;
+			}
+			else if (written[i] is not (' ' or '\t' or '\r'))
+				break;
+		}
+		return false;
 	}
 
 	/// <summary>

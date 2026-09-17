@@ -321,9 +321,9 @@ internal static class ContentVerifier
 	/// </summary>
 	/// <remarks>
 	/// Advances <paramref name="index"/> past a <c>,</c> whose next content character closes a brace
-	/// or a bracket, and leaves it alone otherwise. Those are the only closers the grammar permits a
-	/// trailing comma before: a comma before <c>)</c> or <c>&gt;</c> is not legal C# and is not
-	/// something the printer can have produced, so it is still a verification failure.
+	/// or a bracket, and leaves it alone otherwise. Not every braced list permits a trailing comma,
+	/// so a caller applying this allowance must also reparse through <see cref="TokenStreamComparer"/>.
+	/// A comma before <c>)</c> or <c>&gt;</c> is outside even this character-level allowance.
 	/// </remarks>
 	private static bool SkipTrailingComma(ReadOnlySpan<char> text, ref int index)
 	{

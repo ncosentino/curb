@@ -21,6 +21,51 @@ public class FormattingRunTests
 	}
 
 	[Test]
+	public void A_complex_initializer_is_valid_before_the_successful_write_and_cache_check()
+	{
+		var fs = Repo("root = true\n[*.cs]\nend_of_line = lf\nmax_line_length = 60\ncsharp_keep_existing_linebreaks = false\ncsharp_trailing_comma_in_multiline_lists = true\n");
+		var file = $"{Root}/Values.cs";
+		fs.AddFile(file, new MockFileData("class C { object Values = new Dictionary<string, string> { { \"key\", \"This value is intentionally long enough to wrap onto another line.\" } }; }"));
+		var first = FormattingRun.Execute(fs, Root, write: true, verify: false, explicitFiles: [file], cachePath: $"{Root}/curb.cache");
+		first.ExitCode.Should().Be(0);
+		first.Changed.Should().Be(1);
+		first.Reparsed.Should().Be(1);
+		CSharpSource.TryParse(fs.File.ReadAllText(file), out _, out _).Should().BeTrue();
+		var second = FormattingRun.Execute(fs, Root, write: false, explicitFiles: [file], cachePath: $"{Root}/curb.cache");
+		second.ExitCode.Should().Be(0);
+		second.Changed.Should().Be(0);
+		second.Cached.Should().Be(0);
+	}
+
+	[Test]
+	public void The_exact_multiline_alias_report_formats_successfully()
+	{
+		var fs = Repo("root = true\n[*.cs]\nend_of_line = lf\nmax_line_length = 120\ncsharp_keep_existing_linebreaks = false\ndotnet_sort_system_directives_first = true\ndotnet_separate_import_directive_groups = true\n");
+		var file = $"{Root}/Alias.cs";
+		fs.AddFile(file, new MockFileData("using System;\nusing Alias =\n    System.Collections.Generic.List<string>;\n\nnamespace FormatterRepro;\n\npublic sealed class Sample\n{\n    public Alias Values { get; } = [];\n}\n"));
+		var first = FormattingRun.Execute(fs, Root, write: true, explicitFiles: [file]);
+		first.ExitCode.Should().Be(0);
+		first.Failed.Should().Be(0);
+		fs.File.ReadAllText(file).Should().Contain("using Alias = System.Collections.Generic.List<string>;");
+		FormattingRun.Execute(fs, Root, write: false, explicitFiles: [file]).ExitCode.Should().Be(0);
+	}
+
+	[Test]
+	public void A_comment_section_passes_check_before_becoming_a_cache_hit()
+	{
+		var fs = Repo("root = true\n[*.cs]\nindent_size = 4\nend_of_line = lf\nmax_line_length = 120\ncsharp_keep_existing_linebreaks = false\n");
+		var file = $"{Root}/Comments.cs";
+		fs.AddFile(file, new MockFileData("public class C\n{\n    [System.Obsolete] // trailing\n    // Section\n    [System.CLSCompliant(false)]\n    public int Value;\n}\n"));
+		var first = FormattingRun.Execute(fs, Root, write: true, explicitFiles: [file], cachePath: $"{Root}/curb.cache");
+		first.ExitCode.Should().Be(0);
+		fs.File.ReadAllText(file).Should().Contain("\n    // Section\n");
+		var second = FormattingRun.Execute(fs, Root, write: false, explicitFiles: [file], cachePath: $"{Root}/curb.cache");
+		second.ExitCode.Should().Be(0);
+		second.Changed.Should().Be(0);
+		second.Cached.Should().Be(0);
+	}
+
+	[Test]
 	public async Task A_wrapped_initializer_passes_check_before_it_can_be_cached()
 	{
 		var fs = Repo("root = true\n[*.cs]\nend_of_line = lf\nmax_line_length = 40\ncsharp_keep_existing_linebreaks = true\n");

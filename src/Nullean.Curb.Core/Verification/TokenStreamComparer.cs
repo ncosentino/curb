@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -26,9 +27,9 @@ namespace Nullean.Curb.Verification;
 /// </para>
 /// <para>
 /// Reordering usings changes the token stream on purpose, so when it has happened the using block
-/// is lifted out of the linear walk and checked separately: the two lists of directive texts are
-/// sorted and compared, which is exact rather than lenient — a lost, duplicated or altered
-/// directive all fail it — and the rest of the file is still compared token for token.
+/// is lifted out of the linear walk and checked separately. Token and interior-content-trivia
+/// signatures ignore layout trivia without excusing changed token boundaries, modifiers or comments.
+/// Lost, duplicated or altered directives fail; the rest of the file is compared token for token.
 /// </para>
 /// <para>
 /// Costs one extra parse, so it is opt-in for <c>check</c> (which writes nothing and therefore
@@ -69,7 +70,7 @@ internal static class TokenStreamComparer
 
 		if (usingsReordered)
 		{
-			if (!SameDirectives(originalRoot, reparsed.Root, out failure))
+			if (!SameDirectives(originalRoot, originalText, reparsed.Root, formattedText, out failure))
 				return false;
 
 			originalUsings = DirectiveRegion(originalRoot);
@@ -413,11 +414,11 @@ internal static class TokenStreamComparer
 		return true;
 	}
 
-	/// <summary>Compares the two using lists as multisets of their text.</summary>
-	private static bool SameDirectives(SyntaxNode before, SyntaxNode after, out string? failure)
+	/// <summary>Compares using tokens and interior content trivia, ignoring layout trivia only.</summary>
+	private static bool SameDirectives(SyntaxNode before, ReadOnlySpan<char> beforeText, SyntaxNode after, ReadOnlySpan<char> afterText, out string? failure)
 	{
-		var original = Directives(before);
-		var produced = Directives(after);
+		var original = Directives(before, beforeText);
+		var produced = Directives(after, afterText);
 
 		if (original.Length != produced.Length)
 		{
@@ -433,7 +434,7 @@ internal static class TokenStreamComparer
 			if (string.Equals(original[i], produced[i], StringComparison.Ordinal))
 				continue;
 
-			failure = $"reordering usings altered one: '{original[i]}' is not among the directives written";
+			failure = "reordering usings altered a directive's tokens or content trivia";
 			return false;
 		}
 
@@ -441,10 +442,38 @@ internal static class TokenStreamComparer
 		return true;
 	}
 
-	private static string[] Directives(SyntaxNode root) =>
-		[.. root.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
-			.OfType<UsingDirectiveSyntax>()
-			.Select(directive => directive.ToString())];
+	private static string[] Directives(SyntaxNode root, ReadOnlySpan<char> source)
+	{
+		var directives = new List<string>();
+		var signature = new StringBuilder();
+		foreach (var directive in root.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+			.OfType<UsingDirectiveSyntax>())
+		{
+			signature.Clear();
+			foreach (var token in directive.DescendantTokens())
+			{
+				AppendTrivia(token.LeadingTrivia, directive.Span, source, signature);
+				AppendPart(token.RawKind, token.Span, source, signature);
+				AppendTrivia(token.TrailingTrivia, directive.Span, source, signature);
+			}
+			directives.Add(signature.ToString());
+		}
+		return [.. directives];
+	}
+
+	private static void AppendTrivia(SyntaxTriviaList trivia, TextSpan directive, ReadOnlySpan<char> source, StringBuilder signature)
+	{
+		foreach (var item in trivia)
+		{
+			if (item.IsKind(SyntaxKind.WhitespaceTrivia) || item.IsKind(SyntaxKind.EndOfLineTrivia)
+				|| !directive.Contains(item.Span))
+				continue;
+			AppendPart(item.RawKind, item.Span, source, signature);
+		}
+	}
+
+	private static void AppendPart(int kind, TextSpan span, ReadOnlySpan<char> source, StringBuilder signature) =>
+		signature.Append(kind).Append(':').Append(span.Length).Append(':').Append(source.Slice(span.Start, span.Length)).Append(';');
 
 	/// <summary>The span the using directives occupy, or an empty span at zero when there are none.</summary>
 	private static TextSpan DirectiveRegion(SyntaxNode root)
