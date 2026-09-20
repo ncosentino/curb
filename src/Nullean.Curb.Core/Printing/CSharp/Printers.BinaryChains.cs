@@ -1,6 +1,9 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
+using Nullean.Curb.LayoutRules;
+using Nullean.Curb.Options;
 
 namespace Nullean.Curb.Printing.CSharp;
 
@@ -33,7 +36,11 @@ internal static partial class Printers
 	/// </param>
 	public static bool TryPrintBinaryChain(BinaryExpressionSyntax node, PrintContext context, bool callerAlreadyIndented)
 	{
-		if (context.Options.WrapChainedBinaryExpressions is null)
+		var conditionLayout = context.IsInLogicalConditionHeader(node);
+		var style = conditionLayout
+			? WrapStyle.ChopIfLong
+			: context.Options.WrapChainedBinaryExpressions;
+		if (style is null)
 			return false;
 
 		// Not inside a call's arguments. A chain there is measured by whatever encloses it — a member
@@ -50,7 +57,7 @@ internal static partial class Printers
 
 		var operands = new List<ExpressionSyntax>();
 		var operators = new List<SyntaxToken>();
-		Flatten(node, operands, operators);
+		Flatten(node, operands, operators, nodeBudget: conditionLayout ? 511 : 0);
 
 		// A two-operand chain used to fall through to the ordinary per-operator path instead, on the
 		// reasoning that it reads fine on one line and the group there already offers a break. It
@@ -64,20 +71,31 @@ internal static partial class Printers
 
 		var arena = context.Arena;
 		var before = context.Options.WrapBeforeBinaryOpsign;
+		if (conditionLayout && node.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression)
+			before = false;
+		var spaced = !conditionLayout || context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.BeforeAndAfter;
 
 		void PrintOperator(int operatorIndex)
 		{
 			if (before)
 			{
-				arena.Line();
+				if (spaced)
+					arena.Line();
+				else
+					arena.SoftLine();
 				TokenPrinter.Print(operators[operatorIndex], context);
-				arena.Synthetic(SyntheticText.Space);
+				if (spaced)
+					arena.Synthetic(SyntheticText.Space);
 			}
 			else
 			{
-				arena.Synthetic(SyntheticText.Space);
+				if (spaced)
+					arena.Synthetic(SyntheticText.Space);
 				TokenPrinter.Print(operators[operatorIndex], context);
-				arena.Line();
+				if (spaced)
+					arena.Line();
+				else
+					arena.SoftLine();
 			}
 		}
 
@@ -91,7 +109,7 @@ internal static partial class Printers
 		// them onto shared lines at all. A first operand carrying its own object initializer can
 		// still land at the wrong indent under this style — narrower than issue #77's report, and
 		// left for a follow-up that finds a fix compatible with Fill's own structure.
-		if (context.Options.WrapChainedBinaryExpressions == WrapStyle.WrapIfLong)
+		if (style == WrapStyle.WrapIfLong)
 		{
 			using (arena.IndentIf(!callerAlreadyIndented))
 			{
@@ -118,7 +136,7 @@ internal static partial class Printers
 			// A count, not a fit measurement: chop_always is the same decision
 			// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead
 			// of leaving it to whether the chain fits.
-			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
+			if (style == WrapStyle.ChopAlways)
 				arena.BreakParent();
 
 			// See the WrapIfLong branch above for why operand 0 prints before the indent opens.
@@ -164,10 +182,14 @@ internal static partial class Printers
 	private static void Flatten(
 		BinaryExpressionSyntax node,
 		List<ExpressionSyntax> operands,
-		List<SyntaxToken> operators)
+		List<SyntaxToken> operators,
+		int nodeBudget = 0)
 	{
+		var visited = 0;
 		void Walk(ExpressionSyntax expression)
 		{
+			if (nodeBudget > 0 && ++visited > nodeBudget)
+				throw new LayoutRuleException("A logical condition exceeds the layout syntax budget.");
 			if (expression is BinaryExpressionSyntax binary
 				&& binary.OperatorToken.RawKind == node.OperatorToken.RawKind)
 			{

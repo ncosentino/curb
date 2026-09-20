@@ -22,5 +22,20 @@
       "bodyIndent": 1,
       "closeInvocations": "compact"
     }
+  }, {
+    "id": "smoke-conditions",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "logical-condition",
+      "owner": "if-statement"
+    },
+    "layout": {
+      "recipe": "hanging-logical-condition",
+      "wrap": "if-long",
+      "firstOperand": "with-open",
+      "continuation": "align-first-operand",
+      "operators": "trailing",
+      "closeParen": "own-line-when-broken"
+    }
   }]
 }

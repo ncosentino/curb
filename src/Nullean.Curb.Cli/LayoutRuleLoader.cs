@@ -33,7 +33,7 @@ internal sealed class LayoutRuleLoader(IFileSystem fileSystem, CurbEditorConfig 
 		}
 	}
 
-	private sealed record FilteredRule(WrapperLayoutRule Rule, GlobMatcher[] Filters);
+	private sealed record FilteredRule(LayoutRule Rule, GlobMatcher[] Filters);
 	private sealed record LoadedPack(FilteredRule[] Rules, LayoutRuleSet All, UInt128 Fingerprint);
 
 	internal ResolvedLayoutRules For(string sourcePath, FileConfiguration configuration, string? overridePath = null, string? overrideBase = null)
@@ -106,7 +106,7 @@ internal sealed class LayoutRuleLoader(IFileSystem fileSystem, CurbEditorConfig 
 		var relative = fileSystem.Path.GetRelativePath(baseDirectory, fileSystem.Path.GetFullPath(sourcePath));
 		if (!Within(baseDirectory, fileSystem.Path.GetFullPath(sourcePath)))
 			return new ResolvedLayoutRules(null, pack.Fingerprint, path, baseDirectory);
-		var matched = new List<WrapperLayoutRule>();
+		var matched = new List<LayoutRule>();
 		foreach (var entry in pack.Rules)
 		{
 			foreach (var filter in entry.Filters)

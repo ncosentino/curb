@@ -47,6 +47,9 @@ if ($formatted -ceq $original -or -not $formatted.Contains("CancellationToken ct
 if (-not $formatted.Contains('        var doubled = number * 2;')) {
     throw 'The callback body did not receive normal formatting.'
 }
+if (-not $formatted.Contains("        if (number == RequiredCategoryIdentifierForCondition &&`n            number != ExcludedSegmentIdentifierForCondition &&`n            !ct.IsCancellationRequested`n        )")) {
+    throw 'The condition rule did not compose with the wrapper body.'
+}
 & $Binary @PrefixArguments check --files $source
 if ($LASTEXITCODE -ne 0) { throw "The first custom output was not a fixed point: $LASTEXITCODE" }
 $hash = (Get-FileHash -LiteralPath $source).Hash
@@ -54,6 +57,7 @@ $hash = (Get-FileHash -LiteralPath $source).Hash
 if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $source).Hash -ne $hash) { throw 'Custom formatting changed on the second pass.' }
 $explanation = & $Binary @PrefixArguments explain-layout $source
 if ($LASTEXITCODE -ne 0 -or -not ($explanation -match 'rule = smoke-wrappers;')) { throw 'The custom rule was not explained.' }
+if (-not ($explanation -match 'rule = smoke-conditions;.*recipe = hanging-logical-condition')) { throw 'The condition recipe was not explained.' }
 $explanation
 & $dotnet build $project --configuration Release
 if ($LASTEXITCODE -ne 0) { throw "The custom layout failed compiler/reference enforcement: $LASTEXITCODE" }

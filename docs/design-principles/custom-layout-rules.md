@@ -5,7 +5,7 @@ description: Repository-owned syntax rules for specialized layouts without sourc
 
 # Repository-owned layout rules
 
-Version 1 supports the `lambda-wrapper-chain` matcher and `vertical-wrapper-chain` recipe.
+Version 1 supports wrapper chains and logical condition headers as separate typed recipes.
 Rules are repository data, not executable plugins or source annotations.
 
 Allow a repository to define a canonical layout for selected syntax without putting pragmas,
@@ -83,7 +83,7 @@ The following pack uses neutral application names:
 ```
 
 Rule packs are UTF-8 JSON, optionally with a UTF-8 byte-order mark. All shown properties are
-required. Version 1 accepts the shown matcher and recipe values:
+required for the wrapper recipe. Version 1 accepts the shown matcher and recipe values:
 wrapper and brace indentation are zero, and body indentation is one level. Unsupported
 values fail rather than being accepted without behavior. Limits are 1 MiB per pack,
 256 rules, 64 callees per rule, 32 file filters per rule and 16 wrappers per chain.
@@ -108,6 +108,75 @@ For a matching method, the target shape is:
     }));
 ```
 
+## Logical condition headers
+
+The `logical-condition` matcher selects an `if` header with a top-level `&&` or `||` chain.
+Its `hanging-logical-condition` recipe keeps the first operand beside the opening parenthesis,
+aligns subsequent operands with its actual output column and places the closing parenthesis
+at the statement indentation only when the header breaks.
+
+Use this pack on its own, or append its rule object to an existing pack's `rules` array.
+Existing wrapper rules remain unchanged; both recipes share file filtering, cache identity,
+MSBuild dependencies and diagnostics.
+
+```json
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "logical-headers",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "logical-condition",
+      "owner": "if-statement"
+    },
+    "layout": {
+      "recipe": "hanging-logical-condition",
+      "wrap": "if-long",
+      "firstOperand": "with-open",
+      "continuation": "align-first-operand",
+      "operators": "trailing",
+      "closeParen": "own-line-when-broken"
+    }
+  }]
+}
+```
+
+The condition recipe requires a finite `max_line_length`, deterministic layout and
+non-ignored binary spacing. Unsupported combinations fail explicitly. A short header remains
+inline even if the global binary style is `chop_always`; the selected recipe owns its logical
+breaks rather than inheriting blanket binary chopping.
+
+```csharp
+if (candidate.CategoryId == RequiredCategoryIdentifier &&
+    candidate.SegmentId == RequiredSegmentIdentifier &&
+    candidate.State == "Ready"
+)
+{
+    Accept();
+}
+```
+
+Only chains of the same logical operator are collected together. Explicit parentheses and
+different-precedence logical subtrees remain structured operands. No tokens, grouping or
+operator order change. Comparisons that fit stay intact; an oversized operand uses its own
+ordinary argument/member/binary break opportunities instead of forcing all comparisons apart.
+Indivisible tokens may still exceed the configured width.
+
+The opening seam has no width-driven break. Logical separators and the closing seam follow
+one named header group whose measurement includes the closing delimiter. Continuation anchors
+are allocated per header, so nested conditions cannot overwrite each other's columns.
+Tabs and configured keyword spacing participate in the captured output column.
+
+`while`, `do`, `lock`, nonlogical conditions and ordinary expressions are not selected.
+In an `else if` chain, continuations follow the first operand's actual column; the closing
+delimiter uses the enclosing statement indentation.
+
+Comments inside operands and comments following logical operators use the ordinary trivia
+printer. Content trivia on delimiter seams, comments that prevent moving an operator to a
+trailing position, and directives in a selected condition are currently refused rather than
+moved across operators. Refusal leaves the source unchanged. Collection is bounded to
+511 syntax nodes per chain.
+
 ## Extensibility contract
 
 The framework is a syntax matcher plus a bounded layout recipe, not a collection of
@@ -128,7 +197,7 @@ property paths. Version 1 does not expose a free-form operation program:
 Capture-list expansion is bounded; programs have no arbitrary loops or executable
 predicates. A recipe compiler rejects operations applied to incompatible capture kinds.
 
-The matcher/recipe pair handles nested invocations whose callback lambdas lead to a
+The wrapper matcher/recipe pair handles nested invocations whose callback lambdas lead to a
 block. It is useful for tracing, result, retry and transaction wrappers. A pack can select
 different callees and file scopes without changing the CLI.
 
@@ -217,8 +286,9 @@ This makes a joined input, a previously wrapped input and an already-canonical i
 the same output under deterministic mode.
 
 Both preservation and deterministic modes need explicit semantics. The selected custom
-boundaries are canonical in either mode; preservation remains in effect only for delegated,
-unowned layout. Explain those deliberate local overrides to the user.
+wrapper boundaries are canonical in either mode; preservation remains in effect only for
+delegated, unowned layout. The condition recipe is restricted to deterministic mode.
+Explain those deliberate local overrides to the user.
 
 ## Safety and failure behavior
 
@@ -298,7 +368,9 @@ until one wins.
 ## Explainability and validation
 
 Use `curb explain-layout` to report the resolved policy path, logical base, fingerprint,
-matched rule ID, original owner span and selected recipe without writing source.
+matched rule ID, original owner/header span and actual selected recipe without writing source.
+Application spans are explanatory, not exclusive ownership regions: a wrapper's delegated
+body can contain independently owned condition headers.
 Refusals and configuration errors use `CURB1008`; normal format failures retain their
 existing failure summary and exit code. `print-config` and `doc-tree` resolve the same policy.
 Do not log source bodies or unbounded private configuration payloads by default.

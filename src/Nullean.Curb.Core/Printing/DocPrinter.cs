@@ -50,8 +50,8 @@ internal sealed class DocPrinter
 	private bool _trimTrailingWhitespace;
 
 	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
-	private readonly int[] _anchors = new int[4];
-	private readonly bool[] _resetAnchorOnBlankLine = new bool[4];
+	private int[] _anchors = new int[4];
+	private bool[] _resetAnchorOnBlankLine = new bool[4];
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -86,8 +86,14 @@ internal sealed class DocPrinter
 		_lastSourceEnd = -1;
 		_insideLineComment = false;
 		RoundTripAtRisk = false;
-		Array.Clear(_anchors);
-		Array.Clear(_resetAnchorOnBlankLine);
+		if (_anchors.Length < arena.AnchorCount)
+		{
+			var capacity = Math.Max(arena.AnchorCount, _anchors.Length * 2);
+			Array.Resize(ref _anchors, capacity);
+			Array.Resize(ref _resetAnchorOnBlankLine, capacity);
+		}
+		Array.Clear(_anchors, 0, arena.AnchorCount);
+		Array.Clear(_resetAnchorOnBlankLine, 0, arena.AnchorCount);
 
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);

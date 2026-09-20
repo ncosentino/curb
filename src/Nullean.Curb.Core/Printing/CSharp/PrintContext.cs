@@ -25,8 +25,24 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	public LayoutRuleSet? LayoutRules { get; init; }
 	public List<LayoutRuleApplication>? LayoutApplications { get; private set; }
 
-	public void AppliedLayout(string id, TextSpan span) =>
-		(LayoutApplications ??= []).Add(new LayoutRuleApplication(id, span));
+	public void AppliedLayout(LayoutRule rule, TextSpan span) =>
+		(LayoutApplications ??= []).Add(new LayoutRuleApplication(rule.Id, span, rule.Recipe));
+
+	public SyntaxNode? LogicalConditionRoot { get; set; }
+
+	public bool IsInLogicalConditionHeader(SyntaxNode node)
+	{
+		if (LogicalConditionRoot is null)
+			return false;
+		for (SyntaxNode? current = node; current is not null; current = current.Parent)
+		{
+			if (ReferenceEquals(current, LogicalConditionRoot))
+				return true;
+			if (current is AnonymousFunctionExpressionSyntax or StatementSyntax or MemberDeclarationSyntax)
+				return false;
+		}
+		return false;
+	}
 
 	/// <summary>Tokens emitted by a printer that understands them.</summary>
 	/// <summary>

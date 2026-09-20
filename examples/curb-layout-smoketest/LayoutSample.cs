@@ -2,8 +2,11 @@ namespace LayoutSmoke;
 
 public sealed class LayoutSample
 {
+    private const int RequiredCategoryIdentifierForCondition = 1;
+    private const int ExcludedSegmentIdentifierForCondition = 2;
+
     private async Task<Result<int>> ReadAsync(int number, CancellationToken ct) =>
-        await TraceScope.RunAsync(async () => Outcome.CaptureAsync(async () => { await Task.Yield(); ct.ThrowIfCancellationRequested(); var doubled=number*2; return doubled; }));
+        await TraceScope.RunAsync(async () => Outcome.CaptureAsync(async () => { await Task.Yield(); ct.ThrowIfCancellationRequested(); var doubled=number*2; if (number == RequiredCategoryIdentifierForCondition && number != ExcludedSegmentIdentifierForCondition && !ct.IsCancellationRequested) { doubled++; } return doubled; }));
 
     private readonly record struct Result<T>(T Value);
 
