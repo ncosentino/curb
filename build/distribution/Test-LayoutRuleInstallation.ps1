@@ -44,8 +44,11 @@ $formatted = [IO.File]::ReadAllText($source)
 if ($formatted -ceq $original -or -not $formatted.Contains("CancellationToken ct) => await`n    TraceScope.RunAsync(async () =>`n    Outcome.CaptureAsync(async () =>`n    {")) {
     throw 'The repository rule did not produce declaration-aligned wrapper headers.'
 }
-if (-not $formatted.Contains('        var doubled = number * 2;')) {
+if (-not $formatted.Contains('        var doubled = number * 2 + text.Length;')) {
     throw 'The callback body did not receive normal formatting.'
+}
+if (-not $formatted.Contains("        var text =`n            `"`"`"`n            content`n                indented`n            `"`"`";")) {
+    throw 'The raw-string recipe changed literal contents or did not detach its opener.'
 }
 if (-not $formatted.Contains("        if (number == RequiredCategoryIdentifierForCondition &&`n            number != ExcludedSegmentIdentifierForCondition &&`n            !ct.IsCancellationRequested`n        )")) {
     throw 'The condition rule did not compose with the wrapper body.'
@@ -58,6 +61,7 @@ if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $source).Hash -ne $hash) 
 $explanation = & $Binary @PrefixArguments explain-layout $source
 if ($LASTEXITCODE -ne 0 -or -not ($explanation -match 'rule = smoke-wrappers;')) { throw 'The custom rule was not explained.' }
 if (-not ($explanation -match 'rule = smoke-conditions;.*recipe = hanging-logical-condition')) { throw 'The condition recipe was not explained.' }
+if (-not ($explanation -match 'rule = smoke-raw-strings;.*recipe = standalone-raw-string')) { throw 'The raw-string recipe was not explained.' }
 $explanation
 & $dotnet build $project --configuration Release
 if ($LASTEXITCODE -ne 0) { throw "The custom layout failed compiler/reference enforcement: $LASTEXITCODE" }

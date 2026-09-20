@@ -37,5 +37,18 @@
       "operators": "trailing",
       "closeParen": "own-line-when-broken"
     }
+  }, {
+    "id": "smoke-raw-strings",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "multiline-raw-string",
+      "owner": "expression"
+    },
+    "layout": {
+      "recipe": "standalone-raw-string",
+      "openingDelimiter": "own-line",
+      "indentation": "preserve-closing",
+      "contents": "preserve"
+    }
   }]
 }

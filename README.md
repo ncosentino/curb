@@ -20,8 +20,8 @@ The fork's action entrypoint fails explicitly until an action distribution is en
 silently runs the upstream container instead of this source.
 
 **Repository-specific layouts:** [custom layout rules](docs/design-principles/custom-layout-rules.md)
-let a repository select declaration-aligned callback wrappers and hanging logical-condition
-headers through a data-only rule pack.
+let a repository select declaration-aligned callback wrappers, hanging logical-condition
+headers and standalone multiline raw-string openers through a data-only rule pack.
 Method names stay in consumer configuration, callback bodies still receive normal formatting,
 and no source pragmas are required.
 

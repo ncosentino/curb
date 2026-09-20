@@ -19,6 +19,7 @@ public sealed class LayoutRuleSet
 		var ids = new HashSet<string>(StringComparer.Ordinal);
 		var index = new Dictionary<string, List<WrapperLayoutRule>>(StringComparer.Ordinal);
 		var conditions = new List<LogicalConditionLayoutRule>();
+		var rawStrings = new List<MultilineRawStringLayoutRule>();
 		foreach (var rule in entries)
 		{
 			ArgumentNullException.ThrowIfNull(rule);
@@ -27,6 +28,11 @@ public sealed class LayoutRuleSet
 			if (rule is LogicalConditionLayoutRule condition)
 			{
 				conditions.Add(condition);
+				continue;
+			}
+			if (rule is MultilineRawStringLayoutRule rawString)
+			{
+				rawStrings.Add(rawString);
 				continue;
 			}
 			if (rule is not WrapperLayoutRule wrapper)
@@ -41,12 +47,15 @@ public sealed class LayoutRuleSet
 		_byCallee = index.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.Ordinal);
 		Rules = Array.AsReadOnly(entries);
 		Conditions = conditions.AsReadOnly();
+		RawStrings = rawStrings.AsReadOnly();
 	}
 
 	/// <summary>The selected rules, in configuration order.</summary>
 	public IReadOnlyList<LayoutRule> Rules { get; }
 
 	internal IReadOnlyList<LogicalConditionLayoutRule> Conditions { get; }
+
+	internal IReadOnlyList<MultilineRawStringLayoutRule> RawStrings { get; }
 
 	internal IReadOnlyList<WrapperLayoutRule> Candidates(ExpressionSyntax callee) =>
 		WrapperLayoutRule.LeafName(callee) is { } name && _byCallee.TryGetValue(name, out var rules) ? rules : [];

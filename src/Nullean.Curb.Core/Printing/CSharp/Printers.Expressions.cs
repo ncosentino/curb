@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Documents;
 using Nullean.Curb.Options;
 
@@ -16,7 +17,7 @@ internal static partial class Printers
 	/// For constructs whose internal layout is <i>content</i>, not formatting — interpolated and raw
 	/// string literals above all. Reproducing them verbatim is the correct output, not a fallback.
 	/// </remarks>
-	private static void VerbatimContent(SyntaxNode node, PrintContext context)
+	private static void VerbatimContent(SyntaxNode node, PrintContext context, TextSpan? openingIndent = null)
 	{
 		// node.Span excludes the trivia attached to the first and last tokens, so the comment above
 		// an interpolated string would be dropped without printing it around the verbatim body.
@@ -25,6 +26,13 @@ internal static partial class Printers
 
 		if (first.RawKind != 0)
 			TokenPrinter.PrintLeadingTrivia(first, context);
+
+		if (openingIndent is { } indentation)
+		{
+			context.Arena.LiteralLine(DocFlags.Reindent);
+			if (indentation.Length > 0)
+				context.Arena.SourceText(indentation);
+		}
 
 		// preserveLineEndings: the run is a string literal, so its newlines are part of the value.
 		var span = node.Span;

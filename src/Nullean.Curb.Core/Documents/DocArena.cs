@@ -94,7 +94,7 @@ internal sealed class DocArena
 	/// <summary>Always a newline; forces enclosing groups to break.</summary>
 	public void HardLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Hard, flags);
 
-	/// <summary>Always a newline emitted at column 0, for content that must not be re-indented.</summary>
+	/// <summary>A column-zero newline; Reindent reuses an empty line for a content-owned opening boundary.</summary>
 	public void LiteralLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Literal, flags);
 
 	/// <summary>

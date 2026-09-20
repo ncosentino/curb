@@ -41,6 +41,18 @@ internal static class LayoutRuleCompiler
 				}
 				var match = rule.GetProperty("match");
 				var layout = rule.GetProperty("layout");
+				if (ReadString(match, "kind") == "multiline-raw-string")
+				{
+					RequireObject(match, "kind", "owner");
+					RequireValue(match, "owner", "expression");
+					RequireObject(layout, "recipe", "openingDelimiter", "indentation", "contents");
+					RequireValue(layout, "recipe", "standalone-raw-string");
+					RequireValue(layout, "openingDelimiter", "own-line");
+					RequireValue(layout, "indentation", "preserve-closing");
+					RequireValue(layout, "contents", "preserve");
+					definitions.Add(new LayoutRuleDefinition(new MultilineRawStringLayoutRule(id), files));
+					continue;
+				}
 				if (ReadString(match, "kind") == "logical-condition")
 				{
 					RequireObject(match, "kind", "owner");
