@@ -5,7 +5,8 @@ description: Repository-owned syntax rules for specialized layouts without sourc
 
 # Repository-owned layout rules
 
-Version 1 supports wrapper chains and logical condition headers as separate typed recipes.
+Version 1 supports wrapper chains, logical condition headers and multiline raw strings as
+separate typed recipes.
 Rules are repository data, not executable plugins or source annotations.
 
 Allow a repository to define a canonical layout for selected syntax without putting pragmas,
@@ -177,6 +178,72 @@ trailing position, and directives in a selected condition are currently refused 
 moved across operators. Refusal leaves the source unchanged. Collection is bounded to
 511 syntax nodes per chain.
 
+## Standalone multiline raw strings
+
+The `multiline-raw-string` matcher selects plain, interpolated and UTF-8 multiline raw-string
+expressions. Its `standalone-raw-string` recipe always places the opener on its own line.
+Attached and already-detached input converge to the same layout; this is not preservation
+of an optional source break.
+
+Append this rule to an existing pack, or use it as the only rule:
+
+```json
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "raw-openers",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "multiline-raw-string",
+      "owner": "expression"
+    },
+    "layout": {
+      "recipe": "standalone-raw-string",
+      "openingDelimiter": "own-line",
+      "indentation": "preserve-closing",
+      "contents": "preserve"
+    }
+  }]
+}
+```
+
+Before:
+
+```csharp
+var value = """
+    first
+        indented second
+    """;
+```
+
+After:
+
+```csharp
+var value =
+    """
+    first
+        indented second
+    """;
+```
+
+Only the external opening boundary changes. The opener uses the exact whitespace preceding
+the preserved closing delimiter. Payload text, meaningful indentation, internal line endings,
+quote/dollar counts, interpolation text and UTF-8 suffixes remain unchanged.
+
+One selected-literal path handles initializers, arguments, returns, expression bodies and
+conditional branches. It represents literal newlines explicitly in the document arena and
+reuses a line the parent already opened, including inside forced-flat layout.
+
+The policy works with or without a width and in both layout modes. Ordinary strings, verbatim
+strings, single-line raw strings and unselected formatting retain their existing behavior.
+String/interpolation interiors remain opaque, as they are in ordinary formatting; this rule
+does not reformat nested expressions inside an enclosing verbatim interpolation span.
+
+Existing source suppression still takes precedence. Duplicate raw rules and incompatible
+ownership fail explicitly. For example, a raw opener that is itself the start of a logical
+operand cannot also satisfy an enabled condition recipe's operand-start alignment.
+A raw value nested inside an operand or a wrapper's delegated argument/body can compose.
+
 ## Extensibility contract
 
 The framework is a syntax matcher plus a bounded layout recipe, not a collection of
@@ -286,8 +353,8 @@ This makes a joined input, a previously wrapped input and an already-canonical i
 the same output under deterministic mode.
 
 Both preservation and deterministic modes need explicit semantics. The selected custom
-wrapper boundaries are canonical in either mode; preservation remains in effect only for
-delegated, unowned layout. The condition recipe is restricted to deterministic mode.
+wrapper and raw-string boundaries are canonical in either mode; preservation remains in
+effect only for delegated, unowned layout. The condition recipe is restricted to deterministic mode.
 Explain those deliberate local overrides to the user.
 
 ## Safety and failure behavior
@@ -392,6 +459,7 @@ The acceptance matrix must include:
 | Cache/build | Policy-content-only edits invalidate both cache layers and MSBuild stamps |
 | Reference | Initial recipe remains a stock formatter fixed point and builds with `IDE0055` enforced |
 | Performance | Native no-rule, no-match and matching costs stay within explicitly measured release gates |
+| Raw literals | Exact token/value text, closing indentation, LF/CRLF content, quote/dollar counts and UTF-8 suffixes survive every supported parent context |
 
 ## Validation ownership
 

@@ -211,14 +211,18 @@ internal static class Node
 				break;
 
 			case SyntaxKind.NumericLiteralExpression:
-			case SyntaxKind.StringLiteralExpression:
 			case SyntaxKind.CharacterLiteralExpression:
 			case SyntaxKind.TrueLiteralExpression:
 			case SyntaxKind.FalseLiteralExpression:
 			case SyntaxKind.NullLiteralExpression:
 			case SyntaxKind.DefaultLiteralExpression:
-			case SyntaxKind.Utf8StringLiteralExpression:
 				TokenPrinter.Print(((LiteralExpressionSyntax)node).Token, context);
+				break;
+
+			case SyntaxKind.StringLiteralExpression:
+			case SyntaxKind.Utf8StringLiteralExpression:
+				if (!Printers.TryPrintRawStringLayout(node, context))
+					TokenPrinter.Print(((LiteralExpressionSyntax)node).Token, context);
 				break;
 
 			case SyntaxKind.ThisExpression:
@@ -427,7 +431,8 @@ internal static class Node
 
 			// Interior layout is content, not formatting.
 			case SyntaxKind.InterpolatedStringExpression:
-				Printers.VerbatimExpression(node, context);
+				if (!Printers.TryPrintRawStringLayout(node, context))
+					Printers.VerbatimExpression(node, context);
 				break;
 
 			// ---- names and types -----------------------------------------------------------

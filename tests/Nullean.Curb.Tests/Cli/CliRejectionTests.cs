@@ -8,6 +8,29 @@ namespace Nullean.Curb.Tests.Cli;
 public class CliRejectionTests
 {
 	[Test]
+	public async Task Raw_literal_policy_formats_and_explains_without_annotations(CancellationToken cancellationToken)
+	{
+		var root = Path.Combine(Path.GetTempPath(), "curb-raw-cli-" + Guid.NewGuid().ToString("N"));
+		Directory.CreateDirectory(root);
+		try
+		{
+			var source = Path.Combine(root, "Source.cs");
+			await File.WriteAllTextAsync(source, RawStringLayoutSamples.Attached, cancellationToken);
+			await File.WriteAllTextAsync(Path.Combine(root, "policy.json"), RawStringLayoutSamples.Policy, cancellationToken);
+			await File.WriteAllTextAsync(Path.Combine(root, ".editorconfig"), "root=true\n[*.cs]\n" + RawStringLayoutSamples.Config + "\ncurb_layout_rules=policy.json\n", cancellationToken);
+			var (formatCode, _, formatError) = await Run([CliPath(), "format", "--files", source], cancellationToken);
+			formatCode.Should().Be(0, formatError);
+			(await File.ReadAllTextAsync(source, cancellationToken)).TrimEnd().Should().Be(RawStringLayoutSamples.Detached);
+			var (checkCode, _, checkError) = await Run([CliPath(), "check", "--files", source], cancellationToken);
+			checkCode.Should().Be(0, checkError);
+			var (explainCode, explanation, explainError) = await Run([CliPath(), "explain-layout", source], cancellationToken);
+			explainCode.Should().Be(0, explainError);
+			explanation.Should().Contain("recipe = standalone-raw-string");
+		}
+		finally { Directory.Delete(root, recursive: true); }
+	}
+
+	[Test]
 	public async Task Condition_policy_explanation_reports_the_actual_recipe(CancellationToken cancellationToken)
 	{
 		var root = Path.Combine(Path.GetTempPath(), "curb-condition-cli-" + Guid.NewGuid().ToString("N"));

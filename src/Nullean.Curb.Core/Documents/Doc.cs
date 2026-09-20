@@ -137,6 +137,7 @@ internal enum DocFlags : byte
 	/// already ended the line — that would leave it at the inner indent. Nor can it break
 	/// unconditionally, which inserts a blank line. This does neither: it trims whatever indent is
 	/// pending and writes the correct one, adding a newline only if the line has content.
+	/// On a literal line it only reuses the line; the following content supplies its own indentation.
 	/// </remarks>
 	Reindent = 1 << 6,
 

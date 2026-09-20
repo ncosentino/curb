@@ -369,15 +369,20 @@ internal sealed class DocPrinter
 		// indent because whatever it sits inside (a raw string) owns its own leading whitespace.
 		if (type == LineType.Literal)
 		{
+			// A content-owned opener can reuse a parent break, even inside a forced-flat scope.
+			var reuse = doc.Flags.HasFlag(DocFlags.Reindent);
+			if (reuse)
+				_output.TrimTrailingWhitespace();
 			// B says whose ending this is. A break between two lines of a comment or a disabled #if
 			// branch takes the configured one; a newline inside a string literal keeps the source's,
 			// because there it is a character of the value rather than layout.
-			_output.Append(doc.B switch
-			{
-				Doc.LfEnding => "\n",
-				Doc.CrLfEnding => "\r\n",
-				_ => _endOfLine,
-			});
+			if (!reuse || !_output.AtLineStart())
+				_output.Append(doc.B switch
+				{
+					Doc.LfEnding => "\n",
+					Doc.CrLfEnding => "\r\n",
+					_ => _endOfLine,
+				});
 			_column = 0;
 			_insideLineComment = false;
 			return;

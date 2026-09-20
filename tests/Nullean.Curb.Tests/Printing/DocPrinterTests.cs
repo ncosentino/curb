@@ -11,6 +11,28 @@ namespace Nullean.Curb.Tests.Printing;
 /// </summary>
 public class DocPrinterTests
 {
+	[Test]
+	public void A_literal_boundary_reuses_a_parent_line_and_survives_forced_flat_layout()
+	{
+		var arena = new DocArena();
+		Text(arena, "abc");
+		using (arena.Indent())
+			arena.HardLine();
+		arena.LiteralLine(DocFlags.Reindent);
+		Text(arena, "012");
+		Render(arena).Should().Be("abc\n012");
+
+		var forced = new DocArena();
+		using (forced.ForceFlat())
+		{
+			Text(forced, "abc");
+			forced.Synthetic(SyntheticText.Space);
+			forced.LiteralLine(DocFlags.Reindent);
+			Text(forced, "012");
+		}
+		Render(forced).Should().Be("abc\n012");
+	}
+
 	/// <summary>Source the tests slice text leaves out of. Offsets below index into this.</summary>
 	private const string Source = "0123456789abcdefghijklmnopqrstuvwxyz";
 
