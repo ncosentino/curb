@@ -146,7 +146,7 @@ internal static partial class Printers
 		}
 		else
 			TokenPrinter.PrintIfPresent(method.SemicolonToken, context);
-		context.AppliedLayout(selected.Id, method.Span);
+		context.AppliedLayout(selected, method.Span);
 		return true;
 	}
 

@@ -8,6 +8,32 @@ namespace Nullean.Curb.Tests.Cli;
 public class CliRejectionTests
 {
 	[Test]
+	public async Task Condition_policy_explanation_reports_the_actual_recipe(CancellationToken cancellationToken)
+	{
+		var root = Path.Combine(Path.GetTempPath(), "curb-condition-cli-" + Guid.NewGuid().ToString("N"));
+		Directory.CreateDirectory(root);
+		try
+		{
+			var file = Path.Combine(root, "Source.cs");
+			var policy = Path.Combine(root, "policy.json");
+			await File.WriteAllTextAsync(file, ConditionLayoutSamples.Source, cancellationToken);
+			await File.WriteAllTextAsync(policy, ConditionLayoutSamples.Policy, cancellationToken);
+			await File.WriteAllTextAsync(Path.Combine(root, ".editorconfig"), "root=true\n[*.cs]\n" + ConditionLayoutSamples.Config + "\ncurb_layout_rules=policy.json\n", cancellationToken);
+			var (code, output, error) = await Run([CliPath(), "explain-layout", file], cancellationToken);
+			code.Should().Be(0, error);
+			output.Should().Contain("recipe = hanging-logical-condition");
+			output.Should().NotContain("recipe = vertical-wrapper-chain");
+			(await File.ReadAllTextAsync(file, cancellationToken)).Should().Be(ConditionLayoutSamples.Source);
+			var (formatCode, _, formatError) = await Run([CliPath(), "format", "--files", file], cancellationToken);
+			formatCode.Should().Be(0, formatError);
+			(await File.ReadAllTextAsync(file, cancellationToken)).TrimEnd().Should().Be(ConditionLayoutSamples.Expected);
+			var (checkCode, _, checkError) = await Run([CliPath(), "check", "--files", file], cancellationToken);
+			checkCode.Should().Be(0, checkError);
+		}
+		finally { Directory.Delete(root, recursive: true); }
+	}
+
+	[Test]
 	public async Task Custom_policy_cli_explains_without_writing_then_formats(CancellationToken cancellationToken)
 	{
 		var root = Path.Combine(Path.GetTempPath(), "curb-layout-cli-" + Guid.NewGuid().ToString("N"));

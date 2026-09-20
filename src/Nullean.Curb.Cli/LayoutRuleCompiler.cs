@@ -40,6 +40,21 @@ internal static class LayoutRuleCompiler
 						throw new LayoutRuleConfigurationException("Layout file filters must be relative paths using only literal segments, *, ** and ?.");
 				}
 				var match = rule.GetProperty("match");
+				var layout = rule.GetProperty("layout");
+				if (ReadString(match, "kind") == "logical-condition")
+				{
+					RequireObject(match, "kind", "owner");
+					RequireValue(match, "owner", "if-statement");
+					RequireObject(layout, "recipe", "wrap", "firstOperand", "continuation", "operators", "closeParen");
+					RequireValue(layout, "recipe", "hanging-logical-condition");
+					RequireValue(layout, "wrap", "if-long");
+					RequireValue(layout, "firstOperand", "with-open");
+					RequireValue(layout, "continuation", "align-first-operand");
+					RequireValue(layout, "operators", "trailing");
+					RequireValue(layout, "closeParen", "own-line-when-broken");
+					definitions.Add(new LayoutRuleDefinition(new LogicalConditionLayoutRule(id), files));
+					continue;
+				}
 				RequireObject(match, "kind", "owner", "calleeSyntax", "callbackArgument", "callbackParameters", "terminalBody", "awaitTokens");
 				RequireValue(match, "kind", "lambda-wrapper-chain");
 				RequireValue(match, "owner", "expression-bodied-method");
@@ -47,7 +62,6 @@ internal static class LayoutRuleCompiler
 				RequireValue(match, "callbackParameters", "empty");
 				RequireValue(match, "terminalBody", "block");
 				RequireValue(match, "awaitTokens", "preserve");
-				var layout = rule.GetProperty("layout");
 				RequireObject(layout, "recipe", "anchor", "parameterClose", "arrowAndRootAwait", "wrapperIndent", "lambdaBraceIndent", "bodyIndent", "closeInvocations");
 				RequireValue(layout, "recipe", "vertical-wrapper-chain");
 				RequireValue(layout, "anchor", "declaration");
@@ -91,8 +105,8 @@ internal static class LayoutRuleCompiler
 
 	private static string ReadString(JsonElement element, string name)
 	{
-		var property = element.GetProperty(name);
-		if (property.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(property.GetString()))
+		if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var property)
+			|| property.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(property.GetString()))
 			throw new LayoutRuleConfigurationException($"Layout property '{name}' must be a nonempty string.");
 		return property.GetString()!;
 	}

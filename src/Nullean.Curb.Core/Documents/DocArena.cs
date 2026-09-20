@@ -22,6 +22,7 @@ internal sealed class DocArena
 	private Doc[] _docs;
 	private int _count;
 	private ushort _nextGroupId = 1;
+	private int _nextAnchorId = 4;
 
 	/// <summary>Roughly how many document slots a character of source turns into, used to pre-size the buffer.</summary>
 	private const double SlotsPerSourceChar = 0.3;
@@ -29,6 +30,9 @@ internal sealed class DocArena
 	public DocArena(int capacity = 1024) => _docs = ArrayPool<Doc>.Shared.Rent(Math.Max(capacity, 16));
 
 	public int Count => _count;
+
+	/// <summary>Anchor storage required by this document, including the legacy registers.</summary>
+	public int AnchorCount => _nextAnchorId;
 
 	public ReadOnlySpan<Doc> Docs => _docs.AsSpan(0, _count);
 
@@ -39,6 +43,7 @@ internal sealed class DocArena
 	{
 		_count = 0;
 		_nextGroupId = 1;
+		_nextAnchorId = 4;
 		_externalTexts?.Clear();
 
 		var wanted = (int)(sourceLength * SlotsPerSourceChar);
@@ -48,6 +53,9 @@ internal sealed class DocArena
 
 	/// <summary>Allocates a fresh group id. Ids are dense so the printer can map them to modes with an array.</summary>
 	public ushort NextGroupId() => _nextGroupId++;
+
+	/// <summary>Allocates a distinct output anchor so nested layouts cannot overwrite one another.</summary>
+	public int NextAnchorId() => _nextAnchorId++;
 
 	// ---- leaves ---------------------------------------------------------------------------------
 
@@ -197,8 +205,8 @@ internal sealed class DocArena
 	/// that does not gets them under the <c>from</c>, which is where dotnet format puts them however
 	/// the break came about.
 	/// </remarks>
-	public void AlignedBreakOpportunity(int register) =>
-		Add(new Doc(DocKind.Line, a: (int)LineType.Normal, b: register, flags: DocFlags.AlignToAnchor));
+	public void AlignedBreakOpportunity(int register, bool spaceWhenFlat = true) =>
+		Add(new Doc(DocKind.Line, a: (int)(spaceWhenFlat ? LineType.Normal : LineType.Soft), b: register, flags: DocFlags.AlignToAnchor));
 
 	public DocScope ForceFlat() => Open(new Doc(DocKind.ForceFlat));
 

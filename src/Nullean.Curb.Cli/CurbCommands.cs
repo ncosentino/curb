@@ -270,7 +270,7 @@ internal sealed class CurbCommands
 				return 3;
 			}
 			foreach (var application in result.LayoutApplications)
-				Console.WriteLine($"rule = {application.RuleId}; span = {application.Span.Start}:{application.Span.Length}; recipe = vertical-wrapper-chain");
+				Console.WriteLine($"rule = {application.RuleId}; span = {application.Span.Start}:{application.Span.Length}; recipe = {application.Recipe}");
 			Console.WriteLine($"matched = {result.LayoutApplications.Count}; would-change = {result.Changed}");
 			return 0;
 		}

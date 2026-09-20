@@ -10,7 +10,7 @@ public sealed class LayoutRuleSet
 	/// <summary>Creates a rule set without IO, assembly loading or semantic analysis.</summary>
 	/// <param name="rules">At most 256 rules with unique identifiers.</param>
 	/// <exception cref="ArgumentException">The set exceeds its budget or contains duplicate identifiers.</exception>
-	public LayoutRuleSet(IEnumerable<WrapperLayoutRule> rules)
+	public LayoutRuleSet(IEnumerable<LayoutRule> rules)
 	{
 		ArgumentNullException.ThrowIfNull(rules);
 		var entries = rules.ToArray();
@@ -18,24 +18,35 @@ public sealed class LayoutRuleSet
 			throw new ArgumentException("A rule set cannot exceed 256 rules.", nameof(rules));
 		var ids = new HashSet<string>(StringComparer.Ordinal);
 		var index = new Dictionary<string, List<WrapperLayoutRule>>(StringComparer.Ordinal);
+		var conditions = new List<LogicalConditionLayoutRule>();
 		foreach (var rule in entries)
 		{
 			ArgumentNullException.ThrowIfNull(rule);
 			if (!ids.Add(rule.Id))
 				throw new ArgumentException("Layout rule IDs must be unique.", nameof(rules));
-			foreach (var name in rule.LeafNames.Distinct(StringComparer.Ordinal))
+			if (rule is LogicalConditionLayoutRule condition)
+			{
+				conditions.Add(condition);
+				continue;
+			}
+			if (rule is not WrapperLayoutRule wrapper)
+				throw new ArgumentException("The layout rule kind is unsupported.", nameof(rules));
+			foreach (var name in wrapper.LeafNames.Distinct(StringComparer.Ordinal))
 			{
 				if (!index.TryGetValue(name, out var candidates))
 					index[name] = candidates = [];
-				candidates.Add(rule);
+				candidates.Add(wrapper);
 			}
 		}
 		_byCallee = index.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.Ordinal);
 		Rules = Array.AsReadOnly(entries);
+		Conditions = conditions.AsReadOnly();
 	}
 
 	/// <summary>The selected rules, in configuration order.</summary>
-	public IReadOnlyList<WrapperLayoutRule> Rules { get; }
+	public IReadOnlyList<LayoutRule> Rules { get; }
+
+	internal IReadOnlyList<LogicalConditionLayoutRule> Conditions { get; }
 
 	internal IReadOnlyList<WrapperLayoutRule> Candidates(ExpressionSyntax callee) =>
 		WrapperLayoutRule.LeafName(callee) is { } name && _byCallee.TryGetValue(name, out var rules) ? rules : [];

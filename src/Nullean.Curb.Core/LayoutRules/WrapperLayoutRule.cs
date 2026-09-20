@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Nullean.Curb.LayoutRules;
 
 /// <summary>A data-only vertical layout for configured invocation/lambda chains.</summary>
-public sealed class WrapperLayoutRule
+public sealed class WrapperLayoutRule : LayoutRule
 {
 	private readonly ExpressionSyntax[] _callees;
 
@@ -12,17 +12,9 @@ public sealed class WrapperLayoutRule
 	/// <param name="id">A bounded, unique identifier used in explanations and failures.</param>
 	/// <param name="calleeSyntax">Identifier/member-access spellings; invocation type arguments are preserved but not used for matching.</param>
 	/// <exception cref="ArgumentException">An identifier or callee spelling is invalid or exceeds the rule budget.</exception>
-	public WrapperLayoutRule(string id, IEnumerable<string> calleeSyntax)
+	public WrapperLayoutRule(string id, IEnumerable<string> calleeSyntax) : base(id, "vertical-wrapper-chain")
 	{
 		ArgumentNullException.ThrowIfNull(calleeSyntax);
-		if (string.IsNullOrWhiteSpace(id) || id.Length > 80)
-			throw new ArgumentException("A layout rule ID must contain 1 to 80 characters.", nameof(id));
-		foreach (var character in id)
-		{
-			if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_' or '.'))
-				throw new ArgumentException("A layout rule ID contains an unsupported character.", nameof(id));
-		}
-		Id = id;
 		var spellings = calleeSyntax.ToArray();
 		if (spellings.Length is < 1 or > 64)
 			throw new ArgumentException("A layout rule must name 1 to 64 callees.", nameof(calleeSyntax));
@@ -39,9 +31,6 @@ public sealed class WrapperLayoutRule
 		}
 		CalleeSyntax = Array.AsReadOnly(spellings);
 	}
-
-	/// <summary>The identifier reported when this rule matches or conflicts.</summary>
-	public string Id { get; }
 
 	/// <summary>The immutable configured callee spellings.</summary>
 	public IReadOnlyList<string> CalleeSyntax { get; }
