@@ -53,6 +53,9 @@ if (-not $formatted.Contains("        var text =`n            `"`"`"`n          
 if (-not $formatted.Contains("        if (number == RequiredCategoryIdentifierForCondition &&`n            number != ExcludedSegmentIdentifierForCondition &&`n            !ct.IsCancellationRequested`n        )")) {
     throw 'The condition rule did not compose with the wrapper body.'
 }
+if (-not $formatted.Contains("        return Consume(`n            `"A concatenated message that is long enough to wrap the call beside `" + name +`n            `" and keeps going beyond the configured width.`"`n        );")) {
+    throw 'The string-concatenation recipe did not keep continuations at the argument indent.'
+}
 & $Binary @PrefixArguments check --files $source
 if ($LASTEXITCODE -ne 0) { throw "The first custom output was not a fixed point: $LASTEXITCODE" }
 $hash = (Get-FileHash -LiteralPath $source).Hash
@@ -62,6 +65,7 @@ $explanation = & $Binary @PrefixArguments explain-layout $source
 if ($LASTEXITCODE -ne 0 -or -not ($explanation -match 'rule = smoke-wrappers;')) { throw 'The custom rule was not explained.' }
 if (-not ($explanation -match 'rule = smoke-conditions;.*recipe = hanging-logical-condition')) { throw 'The condition recipe was not explained.' }
 if (-not ($explanation -match 'rule = smoke-raw-strings;.*recipe = standalone-raw-string')) { throw 'The raw-string recipe was not explained.' }
+if (-not ($explanation -match 'rule = smoke-string-concatenation;.*recipe = argument-string-concatenation')) { throw 'The string-concatenation recipe was not explained.' }
 $explanation
 & $dotnet build $project --configuration Release
 if ($LASTEXITCODE -ne 0) { throw "The custom layout failed compiler/reference enforcement: $LASTEXITCODE" }

@@ -5,8 +5,8 @@ description: Repository-owned syntax rules for specialized layouts without sourc
 
 # Repository-owned layout rules
 
-Version 1 supports wrapper chains, logical condition headers and multiline raw strings as
-separate typed recipes.
+Version 1 supports wrapper chains, logical condition headers, multiline raw strings and
+string-concatenation arguments as separate typed recipes.
 Rules are repository data, not executable plugins or source annotations.
 
 Allow a repository to define a canonical layout for selected syntax without putting pragmas,
@@ -243,6 +243,70 @@ Existing source suppression still takes precedence. Duplicate raw rules and inco
 ownership fail explicitly. For example, a raw opener that is itself the start of a logical
 operand cannot also satisfy an enabled condition recipe's operand-start alignment.
 A raw value nested inside an operand or a wrapper's delegated argument/body can compose.
+
+## String-concatenation arguments
+
+The `string-concatenation` matcher selects a `+` chain that contains at least one string or
+interpolated-string operand and whose outermost link is itself an argument of an invocation,
+object creation, element access or constructor initializer. Its
+`argument-string-concatenation` recipe keeps every continuation line at the argument's
+indentation instead of the ordinary hanging continuation indent.
+
+```json
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "argument-strings",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "string-concatenation",
+      "owner": "argument"
+    },
+    "layout": {
+      "recipe": "argument-string-concatenation",
+      "wrap": "if-long",
+      "operators": "trailing",
+      "continuation": "argument-indent"
+    }
+  }]
+}
+```
+
+Before:
+
+```csharp
+logger.Warn(
+    "Scheduler configuration supplied {UnboundCount} setting(s) that never reached the " +
+        "scheduler and are therefore ignored: {UnboundKeys}.",
+    count,
+    keys
+);
+```
+
+After:
+
+```csharp
+logger.Warn(
+    "Scheduler configuration supplied {UnboundCount} setting(s) that never reached the " +
+    "scheduler and are therefore ignored: {UnboundKeys}.",
+    count,
+    keys
+);
+```
+
+Only the continuation indentation is owned. Whether and where the chain breaks stays with the
+ordinary per-operator groups: a chain that fits remains on one line, and a wrapped chain keeps
+packing as many operands as fit onto each line. Operators remain trailing. A named argument
+continues at the argument's indentation, beneath its name.
+
+Numeric `+` chains, other binary operators, chains inside lambda bodies, assignments and
+attribute arguments are not selected. The recipe applies in both layout modes; preservation
+mode already keeps an author-broken chain at the argument's indentation. Suppressed spans take
+precedence, and duplicate string-concatenation rules fail explicitly. A multiline raw-string
+operand composes with the raw-string recipe.
+
+The selected layout builds with `IDE0055` enforced and is a `dotnet format whitespace`
+fixed point.
 
 ## Extensibility contract
 

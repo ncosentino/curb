@@ -46,6 +46,11 @@ public sealed class LayoutSample
         bytes
         """u8;
 
+    private static string Concatenated(string name)
+    {
+        return Consume("A concatenated message that is long enough to wrap the call beside " + name + " and keeps going beyond the configured width.");
+    }
+
     private static string Consume(string text) => text;
 
     private static class TraceScope
