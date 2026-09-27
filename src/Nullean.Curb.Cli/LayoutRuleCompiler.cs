@@ -53,6 +53,18 @@ internal static class LayoutRuleCompiler
 					definitions.Add(new LayoutRuleDefinition(new MultilineRawStringLayoutRule(id), files));
 					continue;
 				}
+				if (ReadString(match, "kind") == "string-concatenation")
+				{
+					RequireObject(match, "kind", "owner");
+					RequireValue(match, "owner", "argument");
+					RequireObject(layout, "recipe", "wrap", "operators", "continuation");
+					RequireValue(layout, "recipe", "argument-string-concatenation");
+					RequireValue(layout, "wrap", "if-long");
+					RequireValue(layout, "operators", "trailing");
+					RequireValue(layout, "continuation", "argument-indent");
+					definitions.Add(new LayoutRuleDefinition(new StringConcatenationLayoutRule(id), files));
+					continue;
+				}
 				if (ReadString(match, "kind") == "logical-condition")
 				{
 					RequireObject(match, "kind", "owner");

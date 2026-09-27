@@ -50,5 +50,18 @@
       "indentation": "preserve-closing",
       "contents": "preserve"
     }
+  }, {
+    "id": "smoke-string-concatenation",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "string-concatenation",
+      "owner": "argument"
+    },
+    "layout": {
+      "recipe": "argument-string-concatenation",
+      "wrap": "if-long",
+      "operators": "trailing",
+      "continuation": "argument-indent"
+    }
   }]
 }

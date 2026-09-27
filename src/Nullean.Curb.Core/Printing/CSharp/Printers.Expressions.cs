@@ -110,6 +110,10 @@ internal static partial class Printers
 		if (TryPrintBinaryChain(node, context, alreadyIndented))
 			return;
 
+		var concatenationRule = OwnedStringConcatenation(node, context, out var concatenationRoot);
+		if (concatenationRule is not null && ReferenceEquals(concatenationRoot, node))
+			context.AppliedLayout(concatenationRule, node.Span);
+
 		// Relayed one more link down: the rest of a uniform chain prints through node.Left at the
 		// same ambient indent, so its own continuation — reached once Left's BinaryExpression call
 		// gets here in turn — is still the condition's, not a nested construct's.
@@ -144,7 +148,7 @@ internal static partial class Printers
 			return;
 		}
 
-		OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented);
+		OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented || concatenationRule is not null);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)

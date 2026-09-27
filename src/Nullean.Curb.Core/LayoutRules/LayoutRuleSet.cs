@@ -20,6 +20,7 @@ public sealed class LayoutRuleSet
 		var index = new Dictionary<string, List<WrapperLayoutRule>>(StringComparer.Ordinal);
 		var conditions = new List<LogicalConditionLayoutRule>();
 		var rawStrings = new List<MultilineRawStringLayoutRule>();
+		var stringConcatenations = new List<StringConcatenationLayoutRule>();
 		foreach (var rule in entries)
 		{
 			ArgumentNullException.ThrowIfNull(rule);
@@ -35,6 +36,11 @@ public sealed class LayoutRuleSet
 				rawStrings.Add(rawString);
 				continue;
 			}
+			if (rule is StringConcatenationLayoutRule stringConcatenation)
+			{
+				stringConcatenations.Add(stringConcatenation);
+				continue;
+			}
 			if (rule is not WrapperLayoutRule wrapper)
 				throw new ArgumentException("The layout rule kind is unsupported.", nameof(rules));
 			foreach (var name in wrapper.LeafNames.Distinct(StringComparer.Ordinal))
@@ -48,6 +54,7 @@ public sealed class LayoutRuleSet
 		Rules = Array.AsReadOnly(entries);
 		Conditions = conditions.AsReadOnly();
 		RawStrings = rawStrings.AsReadOnly();
+		StringConcatenations = stringConcatenations.AsReadOnly();
 	}
 
 	/// <summary>The selected rules, in configuration order.</summary>
@@ -56,6 +63,8 @@ public sealed class LayoutRuleSet
 	internal IReadOnlyList<LogicalConditionLayoutRule> Conditions { get; }
 
 	internal IReadOnlyList<MultilineRawStringLayoutRule> RawStrings { get; }
+
+	internal IReadOnlyList<StringConcatenationLayoutRule> StringConcatenations { get; }
 
 	internal IReadOnlyList<WrapperLayoutRule> Candidates(ExpressionSyntax callee) =>
 		WrapperLayoutRule.LeafName(callee) is { } name && _byCallee.TryGetValue(name, out var rules) ? rules : [];
