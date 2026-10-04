@@ -47,6 +47,20 @@ public class LogicalLambdaLayoutTests
 	}
 
 	[Test]
+	[Arguments("csharp_wrap_parameters_style = chop_always")]
+	[Arguments("csharp_max_formal_parameters_on_line = 1")]
+	public void Fitting_parenthesized_headers_ignore_forced_parameter_chopping(string setting)
+	{
+		const string source = "class C { object M() { return entries.Where((entry, index) => entry.Enabled && entry.Ready); } }";
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(LogicalLambdaLayoutSamples.Config + "\nmax_line_length = 100\n" + setting);
+		var first = formatter.Format(source, options, layoutRules: Rules());
+		first.Success.Should().BeTrue(first.Message);
+		first.Text.Should().Contain("return entries.Where((entry, index) => entry.Enabled && entry.Ready);");
+		formatter.Format(first.Text, options, layoutRules: Rules()).Text.Should().Be(first.Text);
+	}
+
+	[Test]
 	public void Author_wrapping_does_not_change_the_canonical_layout()
 	{
 		var source = LogicalLambdaLayoutSamples.Source.Replace("Any(entry => ", "Any(\nentry =>\n", StringComparison.Ordinal)
@@ -235,17 +249,24 @@ public class LogicalLambdaLayoutTests
 	}
 
 	[Test]
-	public void Wrapper_delegated_bodies_compose_with_logical_lambda_arguments()
+	[Arguments(false)]
+	[Arguments(true)]
+	public void Wrapper_delegated_bodies_compose_with_logical_lambda_arguments(bool postfix)
 	{
 		var source = LayoutRuleSamples.Source.Replace("var value=new Value(number);",
 			"var found = entries.Any(entry => entry.IsEnabled && entry.HasRequiredPermission && entry.IsAvailable); var value=new Value(number);", StringComparison.Ordinal);
-		var rules = new LayoutRuleSet(Rules().Rules.Concat([new WrapperLayoutRule("wrappers", ["TraceScope.RunAsync", "Outcome.CaptureAsync"])]));
+		if (postfix)
+			source = source.Replace("}));", "})).ConfigureAwait(false);", StringComparison.Ordinal);
+		var rules = new LayoutRuleSet(Rules().Rules.Concat([new WrapperLayoutRule("wrappers",
+			["TraceScope.RunAsync", "Outcome.CaptureAsync"], postfix ? ["ConfigureAwait"] : [])]));
 		using var formatter = new CSharpFormatter();
 		var options = TestOptions.Parse(LayoutRuleSamples.Config + "\nmax_line_length = 75");
 		var first = formatter.Format(source, options, layoutRules: rules);
 		first.Success.Should().BeTrue(first.Message);
 		first.LayoutApplications.Count.Should().Be(2);
 		first.Text.Should().Contain("entries.Any(entry =>\n            entry.IsEnabled &&");
+		if (postfix)
+			first.Text.Should().Contain("})).ConfigureAwait(false);");
 		formatter.Format(first.Text, options, layoutRules: rules).Text.Should().Be(first.Text);
 	}
 

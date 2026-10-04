@@ -478,7 +478,7 @@ internal sealed class DocPrinter
 			if (character == ' ')
 				columns++;
 			else if (character == '\t')
-				columns += _tabWidth - columns % _tabWidth;
+				columns += _tabWidth - (columns % _tabWidth);
 			else
 				break;
 		}
