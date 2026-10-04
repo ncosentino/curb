@@ -166,6 +166,9 @@ internal sealed class DocArena
 	/// <summary>Places the subtree at column 0 regardless of the enclosing indent.</summary>
 	public DocScope IndentToRoot() => Open(new Doc(DocKind.Indent, b: Doc.IndentToRoot));
 
+	/// <summary>Places the subtree at a captured indentation column, retaining partial indentation levels.</summary>
+	public DocScope IndentToAnchor(int register) => Open(new Doc(DocKind.Indent, a: register, flags: DocFlags.AlignToAnchor));
+
 	/// <summary>Opens an indent scope only when <paramref name="condition"/> holds.</summary>
 	/// <remarks>
 	/// Writes no document at all when the condition is false, so an option that is off costs nothing
@@ -191,6 +194,9 @@ internal sealed class DocArena
 	/// <summary>Captures an output column, optionally resetting it when alignment crosses a blank line.</summary>
 	public void Anchor(int register, bool resetOnBlankLine = false) =>
 		Add(new Doc(DocKind.Anchor, a: register, b: resetOnBlankLine ? 1 : 0));
+
+	/// <summary>Captures the indentation of the actual output line rather than the current token column.</summary>
+	public void LineIndentAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, flags: DocFlags.AlignToAnchor));
 
 	/// <summary>A hard break that indents to a column captured by <see cref="Anchor"/>.</summary>
 	public void AlignedLine(int register) =>

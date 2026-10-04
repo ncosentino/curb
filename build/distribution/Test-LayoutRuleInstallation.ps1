@@ -14,6 +14,7 @@ $fixture = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..' '..' 'examples' 
 New-Item -ItemType Directory -Path $TestDirectory -ErrorAction Stop | Out-Null
 Get-ChildItem -LiteralPath $fixture -File -Force | Copy-Item -Destination $TestDirectory
 $source = Join-Path $TestDirectory 'LayoutSample.cs'
+$logicalLambdaSource = Join-Path $TestDirectory 'LogicalLambdaSample.cs'
 $policy = Join-Path $TestDirectory '.curb-layout.json'
 $project = Join-Path $TestDirectory 'Probe.csproj'
 $original = [IO.File]::ReadAllText($source)
@@ -39,6 +40,21 @@ if ($PackageVersion) {
 } else {
     & $Binary @PrefixArguments format --files $source
     if ($LASTEXITCODE -ne 0) { throw "Custom rule formatting failed: $LASTEXITCODE" }
+    & $Binary @PrefixArguments format --files $logicalLambdaSource
+    if ($LASTEXITCODE -ne 0) { throw "Logical lambda formatting failed: $LASTEXITCODE" }
+}
+$logicalLambdaFormatted = [IO.File]::ReadAllText($logicalLambdaSource)
+if (-not $logicalLambdaFormatted.Contains("        return entries.Any(entry =>`n            entry >= RequiredMinimumAllowedValue &&`n            (entry == RequiredPrimaryCategoryValue || entry == RequiredSecondaryCategoryValue) &&`n            entry != ExcludedPermissionCategoryValue);")) {
+    throw 'The logical lambda recipe did not retain the inline header, trailing operators, and compact closing delimiter.'
+}
+if (-not $logicalLambdaFormatted.Contains("        if (entries is null ||`n            entries.Any(entry =>`n                string.IsNullOrWhiteSpace(entry) ||`n                entry.StartsWith(`"invalid-`", StringComparison.OrdinalIgnoreCase) ||`n                entry.EndsWith(`"-rejected`", StringComparison.OrdinalIgnoreCase))`n        )")) {
+    throw 'The logical lambda body did not indent from the aligned condition operand.'
+}
+& $Binary @PrefixArguments check --files $logicalLambdaSource
+if ($LASTEXITCODE -ne 0) { throw "Logical lambda output is not a fixed point: $LASTEXITCODE" }
+$logicalLambdaExplanation = & $Binary @PrefixArguments explain-layout $logicalLambdaSource
+if ($LASTEXITCODE -ne 0 -or -not ($logicalLambdaExplanation -match 'rule = smoke-logical-lambdas;.*recipe = hanging-logical-lambda')) {
+    throw 'The logical lambda recipe was not explained.'
 }
 $formatted = [IO.File]::ReadAllText($source)
 if ($formatted -ceq $original -or -not $formatted.Contains("CancellationToken ct) => await`n    TraceScope.RunAsync(async () =>`n    Outcome.CaptureAsync(async () =>`n    {")) {

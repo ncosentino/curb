@@ -30,15 +30,23 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 
 	public SyntaxNode? LogicalConditionRoot { get; set; }
 
-	public bool IsInLogicalConditionHeader(SyntaxNode node)
+	public SyntaxNode? LogicalLambdaRoot { get; set; }
+
+	public bool IsInLogicalLambdaBody(SyntaxNode node) => IsWithinLayoutRoot(node, LogicalLambdaRoot, stopAtArguments: true);
+
+	public bool IsInLogicalConditionHeader(SyntaxNode node) => IsWithinLayoutRoot(node, LogicalConditionRoot);
+
+	private static bool IsWithinLayoutRoot(SyntaxNode node, SyntaxNode? root, bool stopAtArguments = false)
 	{
-		if (LogicalConditionRoot is null)
+		if (root is null)
 			return false;
 		for (SyntaxNode? current = node; current is not null; current = current.Parent)
 		{
-			if (ReferenceEquals(current, LogicalConditionRoot))
+			if (ReferenceEquals(current, root))
 				return true;
 			if (current is AnonymousFunctionExpressionSyntax or StatementSyntax or MemberDeclarationSyntax)
+				return false;
+			if (stopAtArguments && current is ArgumentSyntax)
 				return false;
 		}
 		return false;

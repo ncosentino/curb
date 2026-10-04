@@ -60,7 +60,7 @@ internal static partial class Printers
 
 	private static bool StartsOwnedLogicalOperand(SyntaxNode node, PrintContext context)
 	{
-		if (!context.IsInLogicalConditionHeader(node))
+		if (!context.IsInLogicalConditionHeader(node) && !context.IsInLogicalLambdaBody(node))
 			return false;
 		for (var current = node; current.Parent is { } parent; current = parent)
 		{
@@ -68,7 +68,7 @@ internal static partial class Printers
 				&& binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression
 				&& current.SpanStart == node.SpanStart)
 				return true;
-			if (ReferenceEquals(parent, context.LogicalConditionRoot))
+			if (ReferenceEquals(parent, context.LogicalConditionRoot) || ReferenceEquals(parent, context.LogicalLambdaRoot))
 				break;
 		}
 		return false;

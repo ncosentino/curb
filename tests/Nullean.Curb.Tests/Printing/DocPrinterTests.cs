@@ -12,6 +12,40 @@ namespace Nullean.Curb.Tests.Printing;
 public class DocPrinterTests
 {
 	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void An_indentation_anchor_preserves_partial_levels_through_nested_scopes(bool tabs)
+	{
+		var arena = new DocArena();
+		var column = arena.NextAnchorId();
+		var indentation = arena.NextAnchorId();
+		Text(arena, "012");
+		arena.Anchor(column);
+		arena.AlignedLine(column);
+		Text(arena, "abc");
+		arena.LineIndentAnchor(indentation);
+		using (arena.IndentToAnchor(indentation))
+		using (arena.Indent())
+		using (arena.Group())
+		{
+			arena.HardLine();
+			Text(arena, "def");
+			arena.HardLine();
+			using var fill = arena.Fill();
+			using (fill.Item())
+				Text(arena, "ghi");
+			using (fill.Separator())
+				arena.Line();
+			using (fill.Item())
+				Text(arena, "jkl");
+		}
+		DocValidator.Validate(arena, Source.Length);
+		var options = Options(8) with { UseTabs = tabs, IndentSize = 2, TabWidth = 4 };
+		var indent = tabs ? "\t   " : "     ";
+		DocLayout.Render(arena, Source, options).Should().Be("012\n   abc\n" + indent + "def\n" + indent + "ghi\n" + indent + "jkl");
+	}
+
+	[Test]
 	public void A_literal_boundary_reuses_a_parent_line_and_survives_forced_flat_layout()
 	{
 		var arena = new DocArena();

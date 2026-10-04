@@ -64,5 +64,20 @@
       "operators": "trailing",
       "continuation": "argument-indent"
     }
+  }, {
+    "id": "smoke-logical-lambdas",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "logical-lambda-argument",
+      "owner": "sole-invocation-argument"
+    },
+    "layout": {
+      "recipe": "hanging-logical-lambda",
+      "wrap": "if-long",
+      "header": "inline-if-fits",
+      "continuation": "one-indent",
+      "operators": "trailing",
+      "closeParen": "with-final-operand"
+    }
   }]
 }

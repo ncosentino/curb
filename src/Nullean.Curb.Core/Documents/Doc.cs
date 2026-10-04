@@ -47,7 +47,7 @@ internal enum DocKind : byte
 	/// <summary>Two alternatives chosen by a group's mode. <c>A</c> = slot count of the flat branch. <c>GroupId</c> = group to consult, 0 = enclosing.</summary>
 	IfBreak,
 
-	/// <summary>Shifts the indent of its subtree. <c>B</c> = signed level delta, or <see cref="Doc.IndentToRoot"/>.</summary>
+	/// <summary>Shifts the indent of its subtree. <c>B</c> = signed level delta, or <see cref="Doc.IndentToRoot"/>. With <see cref="DocFlags.AlignToAnchor"/>, <c>A</c> names an absolute indentation anchor.</summary>
 	Indent,
 
 	/// <summary>Prints its subtree flat regardless of width.</summary>
@@ -142,8 +142,8 @@ internal enum DocFlags : byte
 	Reindent = 1 << 6,
 
 	/// <summary>
-	/// Indent this break to a column captured by a <see cref="DocKind.Anchor"/> rather than to the
-	/// enclosing scope's level. The line's <c>B</c> names the register.
+	/// Indent a line or subtree to a captured column. A line's <c>B</c> names the register;
+	/// an indent's <c>A</c> names it. On an anchor, capture the output line's indentation.
 	/// </summary>
 	AlignToAnchor = 1 << 7,
 }
