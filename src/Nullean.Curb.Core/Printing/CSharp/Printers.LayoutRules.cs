@@ -7,7 +7,7 @@ namespace Nullean.Curb.Printing.CSharp;
 
 internal static partial class Printers
 {
-	private readonly record struct WrapperStage(AwaitExpressionSyntax? Await, InvocationExpressionSyntax Invocation, ParenthesizedLambdaExpressionSyntax Callback);
+	private readonly record struct WrapperStage(AwaitExpressionSyntax? Await, InvocationExpressionSyntax Invocation, ParenthesizedLambdaExpressionSyntax Callback, List<InvocationExpressionSyntax> Postfixes);
 
 	private static bool TryPrintLayoutMethod(MethodDeclarationSyntax method, PrintContext context)
 	{
@@ -55,6 +55,13 @@ internal static partial class Printers
 			throw new LayoutRuleException($"Layout rule '{selected.Id}' cannot join a declaration boundary carrying content trivia.");
 		foreach (var stage in selectedStages)
 		{
+			foreach (var postfix in stage.Postfixes)
+			{
+				var member = (MemberAccessExpressionSyntax)postfix.Expression;
+				if (HasAnyTrivia(member.OperatorToken) || HasAnyTrivia(member.Name, context)
+					|| HasAnyTrivia(postfix.ArgumentList, context))
+					throw new LayoutRuleException($"Layout rule '{selected.Id}' encountered unsupported suffix-boundary trivia.");
+			}
 			if ((stage.Await is { } awaited && HasAnyTrivia(awaited.AwaitKeyword))
 				|| HasAnyTrivia(stage.Invocation.Expression, context)
 				|| HasAnyTrivia(stage.Invocation.ArgumentList.OpenParenToken)
@@ -138,6 +145,17 @@ internal static partial class Printers
 		{
 			Spacing.InsideCallParens(context);
 			TokenPrinter.Print(selectedStages[i].Invocation.ArgumentList.CloseParenToken, context);
+			var postfixes = selectedStages[i].Postfixes;
+			for (var postfixIndex = postfixes.Count - 1; postfixIndex >= 0; postfixIndex--)
+			{
+				var postfix = postfixes[postfixIndex];
+				var member = (MemberAccessExpressionSyntax)postfix.Expression;
+				Spacing.BeforeDot(context);
+				TokenPrinter.Print(member.OperatorToken, context);
+				Spacing.AfterDot(context);
+				PrintLayoutName(member.Name, context);
+				Node.Print(postfix.ArgumentList, context);
+			}
 		}
 		if (converted)
 		{
@@ -157,8 +175,19 @@ internal static partial class Printers
 		while (true)
 		{
 			var awaited = expression as AwaitExpressionSyntax;
-			if ((awaited?.Expression ?? expression) is not InvocationExpressionSyntax invocation || !rule.Matches(invocation.Expression))
+			if ((awaited?.Expression ?? expression) is not InvocationExpressionSyntax invocation)
 				return false;
+			var postfixes = new List<InvocationExpressionSyntax>();
+			while (!rule.Matches(invocation.Expression))
+			{
+				if (invocation.Expression is not MemberAccessExpressionSyntax { Expression: InvocationExpressionSyntax receiver } member
+					|| !member.IsKind(SyntaxKind.SimpleMemberAccessExpression) || !rule.MatchesPostfix(member.Name))
+					return false;
+				if (postfixes.Count == 16)
+					throw new LayoutRuleException($"Layout rule '{rule.Id}' exceeds the suffix-chain budget.");
+				postfixes.Add(invocation);
+				invocation = receiver;
+			}
 			var arguments = invocation.ArgumentList.Arguments;
 			if (arguments.Count == 0
 				|| arguments[^1].Expression is not ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters.Count: 0, AttributeLists.Count: 0, ReturnType: null } callback
@@ -166,7 +195,7 @@ internal static partial class Printers
 				return false;
 			if (stages.Count == 16)
 				throw new LayoutRuleException($"Layout rule '{rule.Id}' exceeds the wrapper-chain budget.");
-			stages.Add(new WrapperStage(awaited, invocation, callback));
+			stages.Add(new WrapperStage(awaited, invocation, callback, postfixes));
 			if (callback.Block is { } terminal)
 			{
 				block = terminal;

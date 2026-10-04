@@ -10,7 +10,8 @@
       "callbackArgument": "last",
       "callbackParameters": "empty",
       "terminalBody": "block",
-      "awaitTokens": "preserve"
+      "awaitTokens": "preserve",
+      "postfixCalleeSyntax": ["ConfigureAwait"]
     },
     "layout": {
       "recipe": "vertical-wrapper-chain",

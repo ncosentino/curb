@@ -9,7 +9,7 @@ public sealed class LayoutSample
         await TraceScope.RunAsync(async () => Outcome.CaptureAsync(async () => { await Task.Yield(); ct.ThrowIfCancellationRequested(); var text = """
             content
                 indented
-            """; var doubled=number*2+text.Length; if (number == RequiredCategoryIdentifierForCondition && number != ExcludedSegmentIdentifierForCondition && !ct.IsCancellationRequested) { doubled++; } return doubled; }));
+            """; var doubled=number*2+text.Length; if (number == RequiredCategoryIdentifierForCondition && number != ExcludedSegmentIdentifierForCondition && !ct.IsCancellationRequested) { doubled++; } return doubled; })).ConfigureAwait(false);
 
     private readonly record struct Result<T>(T Value);
 

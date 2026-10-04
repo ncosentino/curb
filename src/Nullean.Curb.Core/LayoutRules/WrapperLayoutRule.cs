@@ -7,12 +7,22 @@ namespace Nullean.Curb.LayoutRules;
 public sealed class WrapperLayoutRule : LayoutRule
 {
 	private readonly ExpressionSyntax[] _callees;
+	private readonly IdentifierNameSyntax[] _postfixes;
 
 	/// <summary>Creates an immutable rule whose callee spellings match syntax, not resolved symbols.</summary>
 	/// <param name="id">A bounded, unique identifier used in explanations and failures.</param>
 	/// <param name="calleeSyntax">Identifier/member-access spellings; invocation type arguments are preserved but not used for matching.</param>
 	/// <exception cref="ArgumentException">An identifier or callee spelling is invalid or exceeds the rule budget.</exception>
-	public WrapperLayoutRule(string id, IEnumerable<string> calleeSyntax) : base(id, "vertical-wrapper-chain")
+	public WrapperLayoutRule(string id, IEnumerable<string> calleeSyntax) : this(id, calleeSyntax, null)
+	{
+	}
+
+	/// <summary>Creates a vertical wrapper rule that also permits explicitly selected postfix invocations.</summary>
+	/// <param name="id">A bounded, unique identifier used in explanations and failures.</param>
+	/// <param name="calleeSyntax">Identifier/member-access spellings of wrapper callees.</param>
+	/// <param name="postfixCalleeSyntax">Optional simple method names allowed after each wrapper invocation. Arguments and type arguments are preserved.</param>
+	/// <exception cref="ArgumentException">An identifier or callee spelling is invalid or exceeds the rule budget.</exception>
+	public WrapperLayoutRule(string id, IEnumerable<string> calleeSyntax, IEnumerable<string>? postfixCalleeSyntax) : base(id, "vertical-wrapper-chain")
 	{
 		ArgumentNullException.ThrowIfNull(calleeSyntax);
 		var spellings = calleeSyntax.ToArray();
@@ -30,10 +40,27 @@ public sealed class WrapperLayoutRule : LayoutRule
 			_callees[i] = expression;
 		}
 		CalleeSyntax = Array.AsReadOnly(spellings);
+		var postfixSpellings = postfixCalleeSyntax?.ToArray() ?? [];
+		if (postfixSpellings.Length > 64)
+			throw new ArgumentException("A layout rule cannot exceed 64 postfix callees.", nameof(postfixCalleeSyntax));
+		_postfixes = new IdentifierNameSyntax[postfixSpellings.Length];
+		for (var i = 0; i < postfixSpellings.Length; i++)
+		{
+			var spelling = postfixSpellings[i];
+			if (string.IsNullOrWhiteSpace(spelling) || spelling.Length > 256
+				|| SyntaxFactory.ParseExpression(spelling, options: new CSharpParseOptions(LanguageVersion.Preview), consumeFullText: true)
+					is not IdentifierNameSyntax { ContainsDiagnostics: false } name)
+				throw new ArgumentException("A postfix callee must be a simple identifier of at most 256 characters.", nameof(postfixCalleeSyntax));
+			_postfixes[i] = name;
+		}
+		PostfixCalleeSyntax = Array.AsReadOnly(postfixSpellings);
 	}
 
 	/// <summary>The immutable configured callee spellings.</summary>
 	public IReadOnlyList<string> CalleeSyntax { get; }
+
+	/// <summary>The immutable allowed postfix method names; an empty list retains the original match contract.</summary>
+	public IReadOnlyList<string> PostfixCalleeSyntax { get; }
 
 	internal IEnumerable<string> LeafNames
 	{
@@ -41,7 +68,19 @@ public sealed class WrapperLayoutRule : LayoutRule
 		{
 			foreach (var callee in _callees)
 				yield return LeafName(callee)!;
+			foreach (var postfix in _postfixes)
+				yield return postfix.Identifier.ValueText;
 		}
+	}
+
+	internal bool MatchesPostfix(SimpleNameSyntax name)
+	{
+		foreach (var postfix in _postfixes)
+		{
+			if (postfix.Identifier.ValueText == name.Identifier.ValueText)
+				return true;
+		}
+		return false;
 	}
 
 	internal bool Matches(ExpressionSyntax expression)

@@ -92,4 +92,35 @@ public class WrapperPostfixTests
 		Action compile = () => LayoutRuleCompiler.Compile(Encoding.UTF8.GetBytes(Policy().Replace("\"ConfigureAwait\"", "\"Task.ConfigureAwait\"", StringComparison.Ordinal)));
 		compile.Should().Throw<LayoutRuleConfigurationException>();
 	}
+
+	[Test]
+	public void An_oversized_selected_suffix_chain_is_refused()
+	{
+		var suffixes = string.Concat(Enumerable.Repeat(".ConfigureAwait(false)", 17));
+		var source = LayoutRuleSamples.Source.Replace("return value; }))", "return value; }))" + suffixes, StringComparison.Ordinal);
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(source, TestOptions.Parse(LayoutRuleSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Message.Should().Contain("suffix-chain budget");
+	}
+
+	[Test]
+	public void Differently_wrapped_sources_converge_and_unselected_calls_are_unchanged()
+	{
+		var source = LayoutRuleSamples.Source.Replace("return value; }))", "return value; })).ConfigureAwait(false)", StringComparison.Ordinal);
+		var options = TestOptions.Parse(LayoutRuleSamples.Config);
+		using var formatter = new CSharpFormatter();
+		var flat = formatter.Format(source, options, layoutRules: Rules());
+		var wrapped = formatter.Format(source.Replace(".ConfigureAwait(false)", "\n.ConfigureAwait(\nfalse\n)", StringComparison.Ordinal), options, layoutRules: Rules());
+		flat.Success.Should().BeTrue(flat.Message);
+		wrapped.Success.Should().BeTrue(wrapped.Message);
+		wrapped.Text.Should().Be(flat.Text);
+		const string unrelated = "class C { Task M() => Other.RunAsync(async () => { Call(); }).ConfigureAwait(false); }";
+		var ordinary = formatter.Format(unrelated, options);
+		var selected = formatter.Format(unrelated, options, layoutRules: Rules());
+		selected.Success.Should().BeTrue(selected.Message);
+		selected.Text.Should().Be(ordinary.Text);
+		selected.LayoutApplications.Should().BeEmpty();
+	}
 }
