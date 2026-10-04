@@ -89,6 +89,7 @@ public class LogicalLambdaLayoutTests
 	[Arguments("entry =>", "entry => /* seam */")]
 	[Arguments(" && ", " /* seam */ && ")]
 	[Arguments(" && ", "\n#if FLAG\n&& entry.Other\n#endif\n&& ")]
+	[Arguments("entry.HasRequiredPermission", "entry.HasRequiredPermission // close seam\n")]
 	public void Unsupported_boundary_trivia_fails_without_output(string before, string after)
 	{
 		using var formatter = new CSharpFormatter();

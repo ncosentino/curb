@@ -11,4 +11,10 @@ internal static class LogicalLambdaSample
     {
         return entries.Any(entry => entry >= RequiredMinimumAllowedValue && (entry == RequiredPrimaryCategoryValue || entry == RequiredSecondaryCategoryValue) && entry != ExcludedPermissionCategoryValue);
     }
+
+    internal static bool Invalid(IEnumerable<string>? entries)
+    {
+        if (entries is null || entries.Any(entry => string.IsNullOrWhiteSpace(entry) || entry.StartsWith("invalid-", StringComparison.OrdinalIgnoreCase) || entry.EndsWith("-rejected", StringComparison.OrdinalIgnoreCase))) { return true; }
+        return false;
+    }
 }

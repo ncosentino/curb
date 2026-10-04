@@ -47,6 +47,9 @@ $logicalLambdaFormatted = [IO.File]::ReadAllText($logicalLambdaSource)
 if (-not $logicalLambdaFormatted.Contains("        return entries.Any(entry =>`n            entry >= RequiredMinimumAllowedValue &&`n            (entry == RequiredPrimaryCategoryValue || entry == RequiredSecondaryCategoryValue) &&`n            entry != ExcludedPermissionCategoryValue);")) {
     throw 'The logical lambda recipe did not retain the inline header, trailing operators, and compact closing delimiter.'
 }
+if (-not $logicalLambdaFormatted.Contains("        if (entries is null ||`n            entries.Any(entry =>`n                string.IsNullOrWhiteSpace(entry) ||`n                entry.StartsWith(`"invalid-`", StringComparison.OrdinalIgnoreCase) ||`n                entry.EndsWith(`"-rejected`", StringComparison.OrdinalIgnoreCase))`n        )")) {
+    throw 'The logical lambda body did not indent from the aligned condition operand.'
+}
 & $Binary @PrefixArguments check --files $logicalLambdaSource
 if ($LASTEXITCODE -ne 0) { throw "Logical lambda output is not a fixed point: $LASTEXITCODE" }
 $logicalLambdaExplanation = & $Binary @PrefixArguments explain-layout $logicalLambdaSource

@@ -40,6 +40,7 @@ internal static partial class Printers
 			|| HasTrailingLogicalLambdaContent(invocation.Expression.GetLastToken())
 			|| TokenPrinter.HasLeadingContent(node.CloseParenToken)
 			|| TokenPrinter.HasLeadingContent(body.GetFirstToken())
+			|| HasTrailingLogicalLambdaContent(body.GetLastToken())
 			|| TokenPrinter.HasAnyContent(lambda.ArrowToken))
 			throw new LayoutRuleException($"Layout rule '{rule.Id}' encountered unsupported lambda-boundary trivia.");
 		foreach (var token in lambda.DescendantTokens())
@@ -60,12 +61,15 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var group = arena.NextGroupId();
 		var header = arena.NextGroupId();
+		var indentAnchor = arena.NextAnchorId();
+		arena.LineIndentAnchor(indentAnchor);
 		var previousRoot = context.LogicalLambdaRoot;
 		var previousIndent = context.IndentedCondition;
 		context.LogicalLambdaRoot = body;
 		context.IndentedCondition = null;
 		try
 		{
+			using (arena.IndentToAnchor(indentAnchor))
 			using (arena.Group(group))
 			{
 				using (arena.Group(header))

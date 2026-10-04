@@ -218,6 +218,8 @@ entries.Any(entry =>
 
 Only an oversized header breaks after the invocation's opening parenthesis. In that
 case the lambda header receives one indent and its body receives one further indent.
+Indentation follows the actual output line, including aligned `if` operands and `else if`
+columns that fall between ordinary indentation levels.
 Logical operators trail their operands, and the closing parenthesis remains beside
 the final operand. Explicit parentheses and precedence remain unchanged. Short operand
 calls remain intact; genuinely oversized operands use ordinary internal wrapping.

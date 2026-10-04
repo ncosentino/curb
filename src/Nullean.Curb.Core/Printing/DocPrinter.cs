@@ -20,10 +20,11 @@ namespace Nullean.Curb.Printing;
 /// </remarks>
 internal sealed class DocPrinter
 {
-	private readonly struct Scope(int end, int indent, PrintMode mode, int resume, bool suppressWidth)
+	private readonly struct Scope(int end, int indent, PrintMode mode, int resume, bool suppressWidth, int indentOffset = 0)
 	{
 		public readonly int End = end;
 		public readonly int Indent = indent;
+		public readonly int IndentOffset = indentOffset;
 		public readonly PrintMode Mode = mode;
 
 		/// <summary>Where to continue once this scope closes, or -1 to just carry on.</summary>
@@ -120,10 +121,10 @@ internal sealed class DocPrinter
 	/// stack is for, and <paramref name="start"/>/<paramref name="end"/> bound each call to its own
 	/// slice of the arena regardless of how deep it is nested.
 	/// </remarks>
-	private void RunSegment(int start, int end, int indent, PrintMode mode, bool suppressWidth)
+	private void RunSegment(int start, int end, int indent, PrintMode mode, bool suppressWidth, int indentOffset = 0)
 	{
 		var baseDepth = _depth;
-		Push(new Scope(end, indent, mode, -1, suppressWidth));
+		Push(new Scope(end, indent, mode, -1, suppressWidth, indentOffset));
 
 		var i = start;
 		while (i < end)
@@ -173,7 +174,7 @@ internal sealed class DocPrinter
 					break;
 
 				case DocKind.Anchor:
-					_anchors[doc.A] = _column;
+					_anchors[doc.A] = doc.Flags.HasFlag(DocFlags.AlignToAnchor) ? CurrentLineIndentColumns() : _column;
 					_resetAnchorOnBlankLine[doc.A] = doc.B != 0;
 					i++;
 					break;
@@ -190,29 +191,38 @@ internal sealed class DocPrinter
 
 				case DocKind.Indent:
 					{
+						if (doc.Flags.HasFlag(DocFlags.AlignToAnchor))
+						{
+							var columns = Math.Max(0, _anchors[doc.A]);
+							var unit = Math.Max(1, _indenter.ColumnsFor(1));
+							Push(new Scope(i + doc.Length, columns / unit, scope.Mode, -1, scope.SuppressWidth, columns % unit));
+							i++;
+							break;
+						}
 						// An indent aimed at another group applies only when that group broke. A
 						// group the walk has not reached has no mode, and an indent nobody asked for
 						// is the safer of the two answers.
 						if (doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Break)
 						{
-							Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, scope.SuppressWidth));
+							Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, scope.SuppressWidth, scope.IndentOffset));
 							i++;
 							break;
 						}
 
 						var indentLevel = doc.B == Doc.IndentToRoot ? 0 : scope.Indent + doc.B;
-						Push(new Scope(i + doc.Length, Math.Max(0, indentLevel), scope.Mode, -1, scope.SuppressWidth));
+						var offset = doc.B == Doc.IndentToRoot || indentLevel < 0 ? 0 : scope.IndentOffset;
+						Push(new Scope(i + doc.Length, Math.Max(0, indentLevel), scope.Mode, -1, scope.SuppressWidth, offset));
 						i++;
 						break;
 					}
 
 				case DocKind.ForceFlat:
-					Push(new Scope(i + doc.Length, scope.Indent, PrintMode.ForceFlat, -1, scope.SuppressWidth));
+					Push(new Scope(i + doc.Length, scope.Indent, PrintMode.ForceFlat, -1, scope.SuppressWidth, scope.IndentOffset));
 					i++;
 					break;
 
 				case DocKind.AlwaysFits:
-					Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, true));
+					Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, true, scope.IndentOffset));
 					i++;
 					break;
 
@@ -221,7 +231,7 @@ internal sealed class DocPrinter
 						var groupMode = ResolveGroupMode(i, doc, scope);
 						if (doc.GroupId != 0)
 							_groupModes[doc.GroupId] = groupMode;
-						Push(new Scope(i + doc.Length, scope.Indent, groupMode, -1, scope.SuppressWidth));
+						Push(new Scope(i + doc.Length, scope.Indent, groupMode, -1, scope.SuppressWidth, scope.IndentOffset));
 						i++;
 						break;
 					}
@@ -233,7 +243,7 @@ internal sealed class DocPrinter
 						if (doc.GroupId != 0)
 							_groupModes[doc.GroupId] = conditionalMode;
 
-						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, conditionalMode, i + doc.Length, scope.SuppressWidth));
+						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, conditionalMode, i + doc.Length, scope.SuppressWidth, scope.IndentOffset));
 						i = chosen;
 						break;
 					}
@@ -248,7 +258,7 @@ internal sealed class DocPrinter
 						var breakStart = flatStart + doc.A;
 						var chosen = targetBroken ? breakStart : flatStart;
 
-						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, scope.Mode, i + doc.Length, scope.SuppressWidth));
+						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, scope.Mode, i + doc.Length, scope.SuppressWidth, scope.IndentOffset));
 						i = chosen;
 						break;
 					}
@@ -308,13 +318,13 @@ internal sealed class DocPrinter
 		{
 			if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
 			{
-				RunSegment(index + 1, end, scope.Indent, scope.Mode, scope.SuppressWidth);
+				RunSegment(index + 1, end, scope.Indent, scope.Mode, scope.SuppressWidth, scope.IndentOffset);
 				return;
 			}
 
 			if (_width == FormatOptions.Off)
 			{
-				RunSegment(index + 1, end, scope.Indent, PrintMode.Flat, scope.SuppressWidth);
+				RunSegment(index + 1, end, scope.Indent, PrintMode.Flat, scope.SuppressWidth, scope.IndentOffset);
 				return;
 			}
 		}
@@ -331,7 +341,7 @@ internal sealed class DocPrinter
 				var lastMode = !_breaks.HasHardBreak(itemStart, itemEnd) && Fits(itemStart, itemEnd, scope)
 					? PrintMode.Flat
 					: PrintMode.Break;
-				RunSegment(itemStart, itemEnd, scope.Indent, lastMode, scope.SuppressWidth);
+				RunSegment(itemStart, itemEnd, scope.Indent, lastMode, scope.SuppressWidth, scope.IndentOffset);
 				break;
 			}
 
@@ -344,8 +354,8 @@ internal sealed class DocPrinter
 			var itemMode = pairFits || itemFitsAlone ? PrintMode.Flat : PrintMode.Break;
 			var sepMode = pairFits ? PrintMode.Flat : PrintMode.Break;
 
-			RunSegment(itemStart, itemEnd, scope.Indent, itemMode, scope.SuppressWidth);
-			RunSegment(sepStart, sepEnd, scope.Indent, sepMode, scope.SuppressWidth);
+			RunSegment(itemStart, itemEnd, scope.Indent, itemMode, scope.SuppressWidth, scope.IndentOffset);
+			RunSegment(sepStart, sepEnd, scope.Indent, sepMode, scope.SuppressWidth, scope.IndentOffset);
 
 			// To the item just printed, past its own separator — not past the next item too, which
 			// this iteration only measured as pairFits's lookahead and never actually printed.
@@ -409,8 +419,7 @@ internal sealed class DocPrinter
 			_output.TrimTrailingWhitespace();
 			if (!_output.AtLineStart())
 				_output.Append(_endOfLine);
-			_output.Append(_indenter.For(scope.Indent));
-			_column = _indenter.ColumnsFor(scope.Indent);
+			EmitIndent(scope);
 			_insideLineComment = false;
 			return;
 		}
@@ -424,7 +433,7 @@ internal sealed class DocPrinter
 				_output.Append(_endOfLine);
 
 			if (_resetAnchorOnBlankLine[doc.B] && EndsAfterBlankLine())
-				_anchors[doc.B] = _indenter.ColumnsFor(scope.Indent);
+				_anchors[doc.B] = _indenter.ColumnsFor(scope.Indent) + scope.IndentOffset;
 
 			// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes,
 			// and the only way to land on a column no tab stop falls on while still honouring
@@ -447,9 +456,33 @@ internal sealed class DocPrinter
 		}
 
 		_output.Append(_endOfLine);
-		_output.Append(_indenter.For(scope.Indent));
-		_column = _indenter.ColumnsFor(scope.Indent);
+		EmitIndent(scope);
 		_insideLineComment = false;
+	}
+
+	private void EmitIndent(in Scope scope)
+	{
+		_output.Append(_indenter.For(scope.Indent));
+		for (var i = 0; i < scope.IndentOffset; i++)
+			_output.Append(' ');
+		_column = _indenter.ColumnsFor(scope.Indent) + scope.IndentOffset;
+	}
+
+	private int CurrentLineIndentColumns()
+	{
+		var written = _output.Written;
+		var line = written[(written.LastIndexOf('\n') + 1)..];
+		var columns = 0;
+		foreach (var character in line)
+		{
+			if (character == ' ')
+				columns++;
+			else if (character == '\t')
+				columns += _tabWidth - columns % _tabWidth;
+			else
+				break;
+		}
+		return columns;
 	}
 
 	private bool EndsAfterBlankLine()
