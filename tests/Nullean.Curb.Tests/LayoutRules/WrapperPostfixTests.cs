@@ -27,6 +27,8 @@ public class WrapperPostfixTests
 		var expected = nested
 			? LayoutRuleSamples.Expected.Replace("}));", "}).ConfigureAwait(false)).ConfigureAwait(true);", StringComparison.Ordinal)
 			: LayoutRuleSamples.Expected.Replace("}));", "})).ConfigureAwait(false);", StringComparison.Ordinal);
+		if (preserve)
+			source = source.Replace("var value=new Value(number); return value;", "var value=new Value(number);\nreturn value;", StringComparison.Ordinal);
 		var options = TestOptions.Parse(LayoutRuleSamples.Config + $"\ncsharp_keep_existing_linebreaks = {preserve}");
 		using var formatter = new CSharpFormatter();
 		var first = formatter.Format(source, options, forceRoundTrip: true, layoutRules: Rules());
