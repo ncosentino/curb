@@ -390,4 +390,25 @@ public class LogicalLambdaLayoutTests
 		first.Text.Should().Contain("Check(firstCondition && secondCondition)");
 		formatter.Format(first.Text, options, layoutRules: Rules()).Text.Should().Be(first.Text);
 	}
+
+	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void Predicate_bodies_indent_from_the_actual_aligned_call_line(bool elseIf)
+	{
+		const string source = "class C { bool M() { if (entries is null || entries.Any(entry => entry is null || string.IsNullOrWhiteSpace(entry.Account) || string.IsNullOrWhiteSpace(entry.Kind))) { return true; } return false; } }";
+		var input = elseIf ? source.Replace("if (entries", "if (ok) { Call(); } else if (entries", StringComparison.Ordinal) : source;
+		var rules = new LayoutRuleSet(Rules().Rules.Concat([new LogicalConditionLayoutRule("conditions")]));
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(LogicalLambdaLayoutSamples.Config + "\nmax_line_length = 80");
+		var first = formatter.Format(input, options, layoutRules: rules);
+		first.Success.Should().BeTrue(first.Message);
+		var callIndent = elseIf ? new string(' ', 17) : new string(' ', 12);
+		var bodyIndent = callIndent + "    ";
+		first.Text.Should().Contain(callIndent + "entries.Any(entry =>\n"
+			+ bodyIndent + "entry is null ||\n"
+			+ bodyIndent + "string.IsNullOrWhiteSpace(entry.Account) ||\n"
+			+ bodyIndent + "string.IsNullOrWhiteSpace(entry.Kind))\n        )");
+		formatter.Format(first.Text, options, layoutRules: rules).Text.Should().Be(first.Text);
+	}
 }
