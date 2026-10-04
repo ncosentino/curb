@@ -69,8 +69,8 @@ internal static partial class Printers
 		context.IndentedCondition = null;
 		try
 		{
-			using (arena.IndentToAnchor(indentAnchor))
 			using (arena.Group(group))
+			using (arena.IndentToAnchor(indentAnchor))
 			{
 				using (arena.Group(header))
 				{
@@ -85,14 +85,14 @@ internal static partial class Printers
 						}
 						else if (lambda is ParenthesizedLambdaExpressionSyntax parenthesized)
 						{
-							PrintAttributeLists(parenthesized.AttributeLists, context);
+							PrintInlineAttributeLists(parenthesized.AttributeLists, context);
 							PrintModifiers(parenthesized.Modifiers, context);
 							if (parenthesized.ReturnType is not null)
 							{
 								Node.Print(parenthesized.ReturnType, context);
 								arena.Synthetic(SyntheticText.Space);
 							}
-							Node.Print(parenthesized.ParameterList, context);
+							ParameterList(parenthesized.ParameterList, context, widthDriven: true);
 						}
 						arena.Synthetic(SyntheticText.Space);
 						TokenPrinter.Print(lambda.ArrowToken, context);

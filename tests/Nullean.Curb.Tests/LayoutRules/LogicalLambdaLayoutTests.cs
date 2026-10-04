@@ -61,6 +61,18 @@ public class LogicalLambdaLayoutTests
 	}
 
 	[Test]
+	public void Fitting_headers_preserve_attributes_modifiers_and_explicit_return_types()
+	{
+		const string source = "class C { bool M() { return entries.Any([Marker] static bool (Entry entry) => entry.Enabled && entry.Ready); } }";
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(LogicalLambdaLayoutSamples.Config + "\nmax_line_length = 120");
+		var first = formatter.Format(source, options, layoutRules: Rules());
+		first.Success.Should().BeTrue(first.Message);
+		first.Text.Should().Contain("return entries.Any([Marker] static bool (Entry entry) => entry.Enabled && entry.Ready);");
+		formatter.Format(first.Text, options, layoutRules: Rules()).Text.Should().Be(first.Text);
+	}
+
+	[Test]
 	public void Author_wrapping_does_not_change_the_canonical_layout()
 	{
 		var source = LogicalLambdaLayoutSamples.Source.Replace("Any(entry => ", "Any(\nentry =>\n", StringComparison.Ordinal)
@@ -174,6 +186,18 @@ public class LogicalLambdaLayoutTests
 		var first = formatter.Format(source, options, layoutRules: Rules());
 		first.Success.Should().BeTrue(first.Message);
 		first.Text.Should().Contain("return exceptionallyLongCollectionName.Any(\n            exceptionallyLongParameterName =>\n                exceptionallyLongParameterName.A &&\n                exceptionallyLongParameterName.B);");
+		formatter.Format(first.Text, options, layoutRules: Rules()).Text.Should().Be(first.Text);
+	}
+
+	[Test]
+	public void Parenthesized_headers_keep_width_driven_fallback_wrapping()
+	{
+		const string source = "class C { object M() { return entries.Where((longEntryParameterName, longIndexParameterName) => longEntryParameterName.Enabled && longEntryParameterName.Ready); } }";
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(LogicalLambdaLayoutSamples.Config + "\nmax_line_length = 70\ncsharp_wrap_parameters_style = chop_always");
+		var first = formatter.Format(source, options, layoutRules: Rules());
+		first.Success.Should().BeTrue(first.Message);
+		first.Text.Should().Contain("return entries.Where(\n            (longEntryParameterName, longIndexParameterName) =>\n                longEntryParameterName.Enabled &&\n                longEntryParameterName.Ready);");
 		formatter.Format(first.Text, options, layoutRules: Rules()).Text.Should().Be(first.Text);
 	}
 

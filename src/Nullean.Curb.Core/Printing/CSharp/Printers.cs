@@ -715,7 +715,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.Identifier, context);
 	}
 
-	public static void ParameterList(ParameterListSyntax node, PrintContext context, bool? wrapBeforeClose = null)
+	public static void ParameterList(ParameterListSyntax node, PrintContext context, bool? wrapBeforeClose = null, bool widthDriven = false)
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
@@ -723,6 +723,7 @@ internal static partial class Printers
 		if (node.Parameters.Count > 0)
 		{
 			var asWritten = SpansLines(node, context);
+			var wrapStyle = widthDriven ? WrapStyle.ChopIfLong : context.Options.WrapParametersStyle;
 
 			// Named, so an expression body hanging off this list can indent against whether it wrapped.
 			var group = arena.NextGroupId();
@@ -734,8 +735,8 @@ internal static partial class Printers
 				// too many parameters rather than whether the line is too long, so it breaks the
 				// group outright instead of leaving it to fit measurement. chop_always is the same
 				// decision with no count to reach.
-				if (context.Options.WrapParametersStyle == WrapStyle.ChopAlways
-					|| (context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit))
+				if (wrapStyle == WrapStyle.ChopAlways
+					|| (!widthDriven && context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit))
 					arena.BreakParent();
 
 				using (arena.Indent())
@@ -748,7 +749,7 @@ internal static partial class Printers
 						Spacing.InsideDeclarationParens(context);
 
 					PrintSeparated(node.Parameters, context, asWritten,
-						fill: context.Options.WrapParametersStyle == WrapStyle.WrapIfLong);
+						fill: wrapStyle == WrapStyle.WrapIfLong);
 				}
 
 				// csharp_wrap_before_declaration_rpar takes the decision away from both the author and
