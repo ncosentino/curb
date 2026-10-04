@@ -47,6 +47,9 @@ if ($formatted -ceq $original -or -not $formatted.Contains("CancellationToken ct
 if (-not $formatted.Contains('        var doubled = number * 2 + text.Length;')) {
     throw 'The callback body did not receive normal formatting.'
 }
+if (-not $formatted.Contains("    })).ConfigureAwait(false);")) {
+    throw 'The wrapper recipe did not preserve its configured postfix call.'
+}
 if (-not $formatted.Contains("        var text =`n            `"`"`"`n            content`n                indented`n            `"`"`";")) {
     throw 'The raw-string recipe changed literal contents or did not detach its opener.'
 }

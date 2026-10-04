@@ -109,6 +109,37 @@ For a matching method, the target shape is:
     }));
 ```
 
+### Postfix calls on selected wrappers
+
+The optional `match.postfixCalleeSyntax` list allows simple method names after each
+selected wrapper call. For example, add this property beside `awaitTokens`:
+
+```json
+"postfixCalleeSyntax": ["ConfigureAwait"]
+```
+
+The matcher looks through those configured invocations to find the wrapper. The renderer
+keeps each postfix call attached to its original wrapper, including arguments, named
+arguments and generic type arguments. It does not add or remove `await` or change any
+argument value.
+
+```csharp
+    public async Task<Result<Value>> GetAsync(
+        int number,
+        CancellationToken ct) => await
+    TraceScope.RunAsync(async () =>
+    Outcome.CaptureAsync(async () =>
+    {
+        return new Value(number);
+    })).ConfigureAwait(false);
+```
+
+Omitting the property retains the original match contract. Unconfigured postfix methods,
+property tails and conditional-access tails do not match. Names are syntax selectors, not
+claims about which overload or symbol an invocation resolves to. The list accepts 1 to 64
+simple identifiers; a stage can carry at most 16 postfix calls. Content trivia on postfix
+boundaries is refused rather than moved across the compact closing delimiters.
+
 ## Logical condition headers
 
 The `logical-condition` matcher selects an `if` header with a top-level `&&` or `||` chain.
