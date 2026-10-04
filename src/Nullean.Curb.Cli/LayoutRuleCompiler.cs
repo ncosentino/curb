@@ -93,7 +93,11 @@ internal static class LayoutRuleCompiler
 					definitions.Add(new LayoutRuleDefinition(new LogicalConditionLayoutRule(id), files));
 					continue;
 				}
-				RequireObject(match, "kind", "owner", "calleeSyntax", "callbackArgument", "callbackParameters", "terminalBody", "awaitTokens");
+				var hasPostfixes = match.TryGetProperty("postfixCalleeSyntax", out var postfixes);
+				if (hasPostfixes)
+					RequireObject(match, "kind", "owner", "calleeSyntax", "callbackArgument", "callbackParameters", "terminalBody", "awaitTokens", "postfixCalleeSyntax");
+				else
+					RequireObject(match, "kind", "owner", "calleeSyntax", "callbackArgument", "callbackParameters", "terminalBody", "awaitTokens");
 				RequireValue(match, "kind", "lambda-wrapper-chain");
 				RequireValue(match, "owner", "expression-bodied-method");
 				RequireValue(match, "callbackArgument", "last");
@@ -109,7 +113,8 @@ internal static class LayoutRuleCompiler
 				RequireNumber(layout, "wrapperIndent", 0);
 				RequireNumber(layout, "lambdaBraceIndent", 0);
 				RequireNumber(layout, "bodyIndent", 1);
-				definitions.Add(new LayoutRuleDefinition(new WrapperLayoutRule(id, ReadStrings(match.GetProperty("calleeSyntax"), 64)), files));
+				definitions.Add(new LayoutRuleDefinition(new WrapperLayoutRule(id, ReadStrings(match.GetProperty("calleeSyntax"), 64),
+					hasPostfixes ? ReadStrings(postfixes, 64) : null), files));
 			}
 			return [.. definitions];
 		}
