@@ -19,6 +19,7 @@ public sealed class LayoutRuleSet
 		var ids = new HashSet<string>(StringComparer.Ordinal);
 		var index = new Dictionary<string, List<WrapperLayoutRule>>(StringComparer.Ordinal);
 		var conditions = new List<LogicalConditionLayoutRule>();
+		var logicalLambdas = new List<LogicalLambdaLayoutRule>();
 		var rawStrings = new List<MultilineRawStringLayoutRule>();
 		var stringConcatenations = new List<StringConcatenationLayoutRule>();
 		foreach (var rule in entries)
@@ -26,6 +27,11 @@ public sealed class LayoutRuleSet
 			ArgumentNullException.ThrowIfNull(rule);
 			if (!ids.Add(rule.Id))
 				throw new ArgumentException("Layout rule IDs must be unique.", nameof(rules));
+			if (rule is LogicalLambdaLayoutRule logicalLambda)
+			{
+				logicalLambdas.Add(logicalLambda);
+				continue;
+			}
 			if (rule is LogicalConditionLayoutRule condition)
 			{
 				conditions.Add(condition);
@@ -53,6 +59,7 @@ public sealed class LayoutRuleSet
 		_byCallee = index.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.Ordinal);
 		Rules = Array.AsReadOnly(entries);
 		Conditions = conditions.AsReadOnly();
+		LogicalLambdas = logicalLambdas.AsReadOnly();
 		RawStrings = rawStrings.AsReadOnly();
 		StringConcatenations = stringConcatenations.AsReadOnly();
 	}
@@ -61,6 +68,8 @@ public sealed class LayoutRuleSet
 	public IReadOnlyList<LayoutRule> Rules { get; }
 
 	internal IReadOnlyList<LogicalConditionLayoutRule> Conditions { get; }
+
+	internal IReadOnlyList<LogicalLambdaLayoutRule> LogicalLambdas { get; }
 
 	internal IReadOnlyList<MultilineRawStringLayoutRule> RawStrings { get; }
 

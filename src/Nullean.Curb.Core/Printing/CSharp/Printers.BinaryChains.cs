@@ -36,7 +36,9 @@ internal static partial class Printers
 	/// </param>
 	public static bool TryPrintBinaryChain(BinaryExpressionSyntax node, PrintContext context, bool callerAlreadyIndented)
 	{
-		var conditionLayout = context.IsInLogicalConditionHeader(node);
+		var lambdaLayout = context.IsInLogicalLambdaBody(node)
+			&& node.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression;
+		var conditionLayout = context.IsInLogicalConditionHeader(node) || lambdaLayout;
 		var style = conditionLayout
 			? WrapStyle.ChopIfLong
 			: context.Options.WrapChainedBinaryExpressions;
@@ -48,7 +50,7 @@ internal static partial class Printers
 		// without necessarily being taken, which left one corpus file long on the first run and
 		// broken on the second. The shapes this rule exists for, a condition or an assignment, are
 		// not in that position.
-		if (IsInsideArguments(node))
+		if (IsInsideArguments(node) && !lambdaLayout)
 			return false;
 
 		// Only the outermost link prints the chain; the rest are its operands.
@@ -58,6 +60,14 @@ internal static partial class Printers
 		var operands = new List<ExpressionSyntax>();
 		var operators = new List<SyntaxToken>();
 		Flatten(node, operands, operators, nodeBudget: conditionLayout ? 511 : 0);
+		if (lambdaLayout)
+		{
+			for (var i = 0; i < operators.Count; i++)
+			{
+				if (TokenPrinter.HasLeadingContent(operators[i]) || HasTrailingLogicalLambdaContent(operands[i].GetLastToken()))
+					throw new LayoutRuleException("A logical lambda cannot move a break around content trivia.");
+			}
+		}
 
 		// A two-operand chain used to fall through to the ordinary per-operator path instead, on the
 		// reasoning that it reads fine on one line and the group there already offers a break. It

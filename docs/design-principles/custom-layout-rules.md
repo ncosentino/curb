@@ -5,8 +5,8 @@ description: Repository-owned syntax rules for specialized layouts without sourc
 
 # Repository-owned layout rules
 
-Version 1 supports wrapper chains, logical condition headers, multiline raw strings and
-string-concatenation arguments as separate typed recipes.
+Version 1 supports wrapper chains, logical condition headers, logical lambda arguments,
+multiline raw strings and string-concatenation arguments as separate typed recipes.
 Rules are repository data, not executable plugins or source annotations.
 
 Allow a repository to define a canonical layout for selected syntax without putting pragmas,
@@ -177,6 +177,61 @@ printer. Content trivia on delimiter seams, comments that prevent moving an oper
 trailing position, and directives in a selected condition are currently refused rather than
 moved across operators. Refusal leaves the source unchanged. Collection is bounded to
 511 syntax nodes per chain.
+
+## Logical lambda arguments
+
+The `logical-lambda-argument` matcher selects a simple or parenthesized expression-bodied
+lambda when it is the sole argument of an invocation and its body is a top-level `&&` or
+`||` chain. Selection is syntactic and independent of the callee's name.
+
+```json
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "logical-lambdas",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "logical-lambda-argument",
+      "owner": "sole-invocation-argument"
+    },
+    "layout": {
+      "recipe": "hanging-logical-lambda",
+      "wrap": "if-long",
+      "header": "inline-if-fits",
+      "continuation": "one-indent",
+      "operators": "trailing",
+      "closeParen": "with-final-operand"
+    }
+  }]
+}
+```
+
+A fitting predicate stays inline. When the complete predicate exceeds the width, the
+call and lambda header stay inline if that header fits independently:
+
+```csharp
+entries.Any(entry =>
+    entry.IsEnabled &&
+    (entry.MatchesPrimaryCategory || entry.MatchesSecondaryCategory) &&
+    entry.HasRequiredPermission);
+```
+
+Only an oversized header breaks after the invocation's opening parenthesis. In that
+case the lambda header receives one indent and its body receives one further indent.
+Logical operators trail their operands, and the closing parenthesis remains beside
+the final operand. Explicit parentheses and precedence remain unchanged. Short operand
+calls remain intact; genuinely oversized operands use ordinary internal wrapping.
+
+The recipe requires a finite width and deterministic layout. It composes with logical
+`if` headers and wrapper delegated bodies. Nested lambdas do not inherit the outer
+predicate's logical layout context. String-concatenation selection remains restricted
+to actual arguments, not lambda bodies. Raw-string recipes can compose inside operands;
+overlapping operand-opening ownership fails explicitly.
+
+Source suppression takes precedence. Duplicate rules, named or ref lambda arguments,
+directives and content trivia on moved header/operator boundaries fail explicitly.
+Interior operand trivia uses normal printing. Collection uses the existing 511-node
+chain budget. There is no token rewrite or verifier exemption.
 
 ## Standalone multiline raw strings
 
