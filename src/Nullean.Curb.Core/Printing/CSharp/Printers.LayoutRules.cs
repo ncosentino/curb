@@ -178,16 +178,20 @@ internal static partial class Printers
 			if ((awaited?.Expression ?? expression) is not InvocationExpressionSyntax invocation)
 				return false;
 			var postfixes = new List<InvocationExpressionSyntax>();
+			var postfixCount = 0;
 			while (!rule.Matches(invocation.Expression))
 			{
 				if (invocation.Expression is not MemberAccessExpressionSyntax { Expression: InvocationExpressionSyntax receiver } member
-					|| !member.IsKind(SyntaxKind.SimpleMemberAccessExpression) || !rule.MatchesPostfix(member.Name))
+					|| member.RawKind != (int)SyntaxKind.SimpleMemberAccessExpression || !rule.MatchesPostfix(member.Name))
 					return false;
-				if (postfixes.Count == 16)
-					throw new LayoutRuleException($"Layout rule '{rule.Id}' exceeds the suffix-chain budget.");
-				postfixes.Add(invocation);
+				if (++postfixCount > 511)
+					return false;
+				if (postfixCount <= 16)
+					postfixes.Add(invocation);
 				invocation = receiver;
 			}
+			if (postfixCount > 16)
+				throw new LayoutRuleException($"Layout rule '{rule.Id}' exceeds the suffix-chain budget.");
 			var arguments = invocation.ArgumentList.Arguments;
 			if (arguments.Count == 0
 				|| arguments[^1].Expression is not ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters.Count: 0, AttributeLists.Count: 0, ReturnType: null } callback

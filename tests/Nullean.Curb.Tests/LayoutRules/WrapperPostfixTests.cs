@@ -106,6 +106,20 @@ public class WrapperPostfixTests
 	}
 
 	[Test]
+	public void Suffix_budgets_do_not_refuse_unselected_receivers()
+	{
+		var source = "class C { Task M() => Other.RunAsync(async () => { Call(); })"
+			+ string.Concat(Enumerable.Repeat(".ConfigureAwait(false)", 17)) + "; }";
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(LayoutRuleSamples.Config);
+		var ordinary = formatter.Format(source, options);
+		var selected = formatter.Format(source, options, layoutRules: Rules());
+		selected.Success.Should().BeTrue(selected.Message);
+		selected.Text.Should().Be(ordinary.Text);
+		selected.LayoutApplications.Should().BeEmpty();
+	}
+
+	[Test]
 	public void Differently_wrapped_sources_converge_and_unselected_calls_are_unchanged()
 	{
 		var source = LayoutRuleSamples.Source.Replace("return value; }))", "return value; })).ConfigureAwait(false)", StringComparison.Ordinal);
