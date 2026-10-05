@@ -79,5 +79,20 @@
       "operators": "trailing",
       "closeParen": "with-final-operand"
     }
+  }, {
+    "id": "smoke-expression-lambdas",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "expression-lambda-argument",
+      "owner": "sole-invocation-argument",
+      "body": "nonlogical-expression"
+    },
+    "layout": {
+      "recipe": "attached-expression-lambda",
+      "wrap": "if-long",
+      "header": "inline-if-fits",
+      "continuation": "one-indent",
+      "closeParen": "with-body"
+    }
   }]
 }

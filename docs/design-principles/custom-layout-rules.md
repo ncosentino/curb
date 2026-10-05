@@ -5,8 +5,9 @@ description: Repository-owned syntax rules for specialized layouts without sourc
 
 # Repository-owned layout rules
 
-Version 1 supports wrapper chains, logical condition headers, logical lambda arguments,
-multiline raw strings and string-concatenation arguments as separate typed recipes.
+Version 1 supports wrapper chains, logical condition headers, logical and nonlogical
+expression-lambda arguments, multiline raw strings and string-concatenation arguments
+as separate typed recipes.
 Rules are repository data, not executable plugins or source annotations.
 
 Allow a repository to define a canonical layout for selected syntax without putting pragmas,
@@ -267,6 +268,79 @@ Source suppression takes precedence. Duplicate rules, named or ref lambda argume
 directives and content trivia on moved header/operator boundaries fail explicitly.
 Interior operand trivia uses normal printing. Collection uses the existing 511-node
 chain budget. There is no token rewrite or verifier exemption.
+
+## Expression lambda arguments
+
+The `expression-lambda-argument` matcher selects an expression-bodied lambda when it
+is the sole argument of an invocation and its body is not a top-level `&&` or `||`
+expression. It covers pattern predicates, projections and other expression bodies
+without interpreting return types or selecting by method name.
+
+```json
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "expression-lambdas",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "expression-lambda-argument",
+      "owner": "sole-invocation-argument",
+      "body": "nonlogical-expression"
+    },
+    "layout": {
+      "recipe": "attached-expression-lambda",
+      "wrap": "if-long",
+      "header": "inline-if-fits",
+      "continuation": "one-indent",
+      "closeParen": "with-body"
+    }
+  }]
+}
+```
+
+A fitting callback remains inline. A longer pattern predicate breaks after the arrow
+while retaining a fitting call header and compact closing delimiters:
+
+```csharp
+if (entries.Any(entry =>
+    entry.Status is not (ResultStatus.Unavailable or ResultStatus.NotApplicable)))
+{
+    return false;
+}
+```
+
+An expression with its own wrapping opportunities uses normal internal formatting.
+A fitting constructor introducer stays attached while its arguments wrap:
+
+```csharp
+return entries.Select(entry => new SearchResult(
+    entry.Id,
+    Map(entry.CurrentValue),
+    Map(entry.PreviousValue)
+));
+```
+
+An oversized body introducer can break after the arrow. Only an oversized callback
+header breaks after the invocation opener. Constructor and nested invocation arguments
+retain their configured wrapping policy. Selected parenthesized lambda headers use width
+rather than forced parameter chopping; ordinary declarations remain unchanged.
+
+The rule coordinates enclosing `if` and `else if` parentheses for a selected invocation,
+including parenthesized and negated forms. Other control-flow keywords keep their existing
+header layout. A logical condition chain still uses the logical-condition recipe.
+Continuation indentation follows the actual output line, including aligned operands,
+tabs and `else if` columns.
+
+The logical-lambda and expression-lambda matchers have disjoint body selectors. Configure
+both to cover top-level logical predicates and other expression callbacks; there is no
+implicit precedence between overlapping rules. Nested callbacks select their own rules.
+Multiple arguments and block bodies do not match. Source suppression wins.
+
+The recipe requires a finite width, deterministic layout and canonical binary spacing.
+Named or ref lambda arguments, conflicting rules, directives and content trivia on moved
+header or closing boundaries fail explicitly without output. Interior body trivia uses
+normal printing. The shared callback renderer preserves tokens, normal body formatting
+and first-pass idempotency without a semantic model or verifier exemption.
 
 ## Standalone multiline raw strings
 

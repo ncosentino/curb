@@ -69,11 +69,11 @@ internal static partial class Printers
 		}
 		List<ExpressionSyntax>? operands = null;
 		List<SyntaxToken>? operators = null;
-		if (rule is LogicalLambdaLayoutRule)
+		if (rule is LogicalLambdaLayoutRule && body is BinaryExpressionSyntax logicalBody)
 		{
 			operands = [];
 			operators = [];
-			Flatten(body, operands, operators, nodeBudget: 511);
+			Flatten(logicalBody, operands, operators, nodeBudget: 511);
 			for (var i = 0; i < operators.Count; i++)
 			{
 				if (TokenPrinter.HasLeadingContent(operators[i]) || HasTrailingLambdaContent(operands[i].GetLastToken()))

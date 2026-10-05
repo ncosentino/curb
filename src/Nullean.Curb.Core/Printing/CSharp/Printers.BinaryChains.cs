@@ -64,7 +64,7 @@ internal static partial class Printers
 		{
 			for (var i = 0; i < operators.Count; i++)
 			{
-				if (TokenPrinter.HasLeadingContent(operators[i]) || HasTrailingLogicalLambdaContent(operands[i].GetLastToken()))
+				if (TokenPrinter.HasLeadingContent(operators[i]) || HasTrailingLambdaContent(operands[i].GetLastToken()))
 					throw new LayoutRuleException("A logical lambda cannot move a break around content trivia.");
 			}
 		}

@@ -60,6 +60,12 @@ jobs:
         run: |
           dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/Nullean.Curb.Tests.LayoutRules/*/*' --minimum-expected-tests 1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise the managed CLI and compiler reference
+        shell: pwsh
+        run: |
+          $dotnet = (Get-Command dotnet -CommandType Application).Source
+          $dll = Join-Path $PWD '.artifacts' 'bin' 'Nullean.Curb.Cli' 'release' 'curb.dll'
+          ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $dotnet -PrefixArguments @($dll) -TestDirectory (Join-Path $env:RUNNER_TEMP 'managed-layout-rules')
 
   preview-unions:
     if: github.repository == 'ncosentino/curb' && (!inputs.layout_tests_only || inputs.full || inputs.publish_release)
