@@ -110,6 +110,7 @@ internal static partial class Printers
 					{
 						var bodyHeader = arena.NextGroupId();
 						using (arena.Group(bodyHeader))
+						using (arena.Indent())
 							arena.Line();
 						using (arena.IndentIfBroken(bodyHeader))
 							Node.Print(body, context);
@@ -196,7 +197,7 @@ internal static partial class Printers
 		body switch
 		{
 			AwaitExpressionSyntax awaited => LambdaBodyHasOwnBreaks(awaited.Expression),
-			InvocationExpressionSyntax { ArgumentList.Arguments.Count: 0, Expression: SimpleNameSyntax } => false,
+			InvocationExpressionSyntax { ArgumentList.Arguments.Count: 0 } => false,
 			MemberAccessExpressionSyntax => false,
 			ObjectCreationExpressionSyntax { ArgumentList: null or { Arguments.Count: 0 }, Initializer: null } => false,
 			ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0, Initializer: null } => false,

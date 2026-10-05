@@ -94,6 +94,45 @@ public class ExpressionLambdaLayoutTests
 	}
 
 	[Test]
+	[Arguments(29, false)]
+	[Arguments(28, true)]
+	public void The_width_boundary_includes_the_enclosing_if_delimiter(int width, bool broken)
+	{
+		var header = broken ? "if (xs.Any(x =>\n            x.A))" : "if (xs.Any(x => x.A))";
+		var expected = $$"""
+			class C
+			{
+			    void M()
+			    {
+			        {{header}}
+			        {
+			            Call();
+			        }
+			    }
+			}
+			""";
+		AssertLayout("class C { void M() { if (xs.Any(x => x.A)) { Call(); } } }", expected, $"max_line_length = {width}");
+	}
+
+	[Test]
+	[Arguments(39, false)]
+	[Arguments(38, true)]
+	public void Zero_argument_body_calls_do_not_hide_the_statement_delimiter(int width, bool broken)
+	{
+		var statement = broken ? "return xs.Select(x =>\n            x.Get());" : "return xs.Select(x => x.Get());";
+		var expected = $$"""
+			class C
+			{
+			    object M()
+			    {
+			        {{statement}}
+			    }
+			}
+			""";
+		AssertLayout("class C { object M() { return xs.Select(x => x.Get()); } }", expected, $"max_line_length = {width}");
+	}
+
+	[Test]
 	public void Nonmatching_arguments_and_logical_callbacks_retain_their_existing_layout()
 	{
 		const string source = "class C { void M() { Call(x => x.A, other); Call(x => { return x.A; }); Call(x => x.A && x.B); } }";
@@ -217,6 +256,70 @@ public class ExpressionLambdaLayoutTests
 			}
 			""";
 		AssertLayout(source, expected);
+	}
+
+	[Test]
+	public void Implicit_construction_uses_the_same_header_and_argument_layout() =>
+		AssertLayout(ExpressionLambdaLayoutSamples.ProjectionSource.Replace("new SearchResult(", "new(", StringComparison.Ordinal),
+			ExpressionLambdaLayoutSamples.ProjectionExpected.Replace("new SearchResult(", "new(", StringComparison.Ordinal),
+			"max_line_length = 80");
+
+	[Test]
+	public void Interior_body_comments_use_normal_trivia_printing()
+	{
+		var source = ExpressionLambdaLayoutSamples.ProjectionSource.Replace("Map(entry.CurrentValue)", "Map(entry /* interior */ .CurrentValue)", StringComparison.Ordinal);
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var first = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: Rules());
+		first.Success.Should().BeTrue(first.Message);
+		first.Text.Should().Contain("/* interior */");
+		first.LayoutApplications.Should().ContainSingle();
+		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: Rules());
+		second.Success.Should().BeTrue(second.Message);
+		second.Text.Should().Be(first.Text);
+	}
+
+	[Test]
+	public void Raw_string_rules_compose_in_delegated_invocation_bodies()
+	{
+		const string source = """"
+			class C
+			{
+			    object M()
+			    {
+			        return entries.Select(entry => Consume("""
+			            content
+			            """));
+			    }
+			}
+			"""";
+		var rules = new LayoutRuleSet(Rules().Rules.Concat([new MultilineRawStringLayoutRule("raw")]));
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var first = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		first.Success.Should().BeTrue(first.Message);
+		first.LayoutApplications.Count.Should().Be(2);
+		first.Text.Should().Contain("content");
+		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		second.Success.Should().BeTrue(second.Message);
+		second.Text.Should().Be(first.Text);
+	}
+
+	[Test]
+	public void Wrapper_delegated_bodies_use_the_shared_callback_headers()
+	{
+		var source = LayoutRuleSamples.Source.Replace("var value=new Value(number);",
+			"var projected = entries.Select(entry => new SearchResult(entry.Id, Map(entry.CurrentValue), Map(entry.PreviousValue))); var value=new Value(number);", StringComparison.Ordinal);
+		var rules = new LayoutRuleSet(Rules().Rules.Concat([new WrapperLayoutRule("wrappers", ["TraceScope.RunAsync", "Outcome.CaptureAsync"])]));
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(LayoutRuleSamples.Config + "\nmax_line_length = 100");
+		var first = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		first.Success.Should().BeTrue(first.Message);
+		first.LayoutApplications.Count.Should().Be(2);
+		first.Text.Should().Contain("Select(entry => new SearchResult(");
+		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		second.Success.Should().BeTrue(second.Message);
+		second.Text.Should().Be(first.Text);
 	}
 
 	[Test]
