@@ -926,7 +926,7 @@ internal static partial class Printers
 
 	public static void ArgumentList(ArgumentListSyntax node, PrintContext context)
 	{
-		if (TryPrintLogicalLambdaLayout(node, context))
+		if (TryPrintLambdaArgumentLayout(node, context))
 			return;
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);

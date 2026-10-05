@@ -18,6 +18,10 @@ on:
         description: Optional explicit prerelease version; empty uses MinVer
         type: string
         default: ''
+      layout_tests_only:
+        description: Run only managed layout-rule tests; full and release validation override this
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,8 +37,38 @@ env:
   MinVerVersionOverride: ${{ inputs.release_version }}
 
 jobs:
+  layout-tests:
+    if: github.repository == 'ncosentino/curb' && inputs.layout_tests_only && !inputs.full && !inputs.publish_release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
+        with:
+          dotnet-version: 10.0.303
+      - name: Run layout-rule tests
+        shell: pwsh
+        run: |
+          dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/Nullean.Curb.Tests.LayoutRules/*/*' --minimum-expected-tests 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise the managed CLI and compiler reference
+        shell: pwsh
+        run: |
+          $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source
+          $dll = Join-Path $PWD '.artifacts' 'bin' 'Nullean.Curb.Cli' 'release' 'curb.dll'
+          ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $dotnet -PrefixArguments @($dll) -TestDirectory (Join-Path $env:RUNNER_TEMP 'managed-layout-rules')
+
   preview-unions:
-    if: github.repository == 'ncosentino/curb'
+    if: github.repository == 'ncosentino/curb' && (!inputs.layout_tests_only || inputs.full || inputs.publish_release)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -76,7 +110,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   managed:
-    if: github.repository == 'ncosentino/curb'
+    if: github.repository == 'ncosentino/curb' && (!inputs.layout_tests_only || inputs.full || inputs.publish_release)
     strategy:
       fail-fast: false
       matrix:
@@ -106,7 +140,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   native:
-    if: github.repository == 'ncosentino/curb'
+    if: github.repository == 'ncosentino/curb' && (!inputs.layout_tests_only || inputs.full || inputs.publish_release)
     strategy:
       fail-fast: false
       matrix:
@@ -191,7 +225,7 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
   corpus:
-    if: github.repository == 'ncosentino/curb'
+    if: github.repository == 'ncosentino/curb' && (!inputs.layout_tests_only || inputs.full || inputs.publish_release)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

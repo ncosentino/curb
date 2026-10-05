@@ -15,6 +15,7 @@ New-Item -ItemType Directory -Path $TestDirectory -ErrorAction Stop | Out-Null
 Get-ChildItem -LiteralPath $fixture -File -Force | Copy-Item -Destination $TestDirectory
 $source = Join-Path $TestDirectory 'LayoutSample.cs'
 $logicalLambdaSource = Join-Path $TestDirectory 'LogicalLambdaSample.cs'
+$expressionLambdaSource = Join-Path $TestDirectory 'ExpressionLambdaSample.cs'
 $policy = Join-Path $TestDirectory '.curb-layout.json'
 $project = Join-Path $TestDirectory 'Probe.csproj'
 $original = [IO.File]::ReadAllText($source)
@@ -42,6 +43,26 @@ if ($PackageVersion) {
     if ($LASTEXITCODE -ne 0) { throw "Custom rule formatting failed: $LASTEXITCODE" }
     & $Binary @PrefixArguments format --files $logicalLambdaSource
     if ($LASTEXITCODE -ne 0) { throw "Logical lambda formatting failed: $LASTEXITCODE" }
+    & $Binary @PrefixArguments format --files $expressionLambdaSource
+    if ($LASTEXITCODE -ne 0) { throw "Expression lambda formatting failed: $LASTEXITCODE" }
+}
+$expressionLambdaFormatted = [IO.File]::ReadAllText($expressionLambdaSource)
+if (-not $expressionLambdaFormatted.Contains("        if (entries.Any(entry =>`n            entry.Length is not (RequiredMinimumAcceptedTextLength or RequiredSecondaryAcceptedTextLength)))")) {
+    throw 'The expression lambda recipe did not retain the pattern callback and enclosing if header.'
+}
+if (-not $expressionLambdaFormatted.Contains("        return entries.Select(entry => new KeyValuePair<string, string>(`n            entry.Substring(0, RequiredMinimumAcceptedTextLength),`n            entry.ToUpperInvariant()`n        ));")) {
+    throw 'The expression lambda recipe did not delegate constructor arguments without an extra callback indent.'
+}
+& $Binary @PrefixArguments check --files $expressionLambdaSource
+if ($LASTEXITCODE -ne 0) { throw "Expression lambda output is not a fixed point: $LASTEXITCODE" }
+$expressionLambdaHash = (Get-FileHash -LiteralPath $expressionLambdaSource).Hash
+& $Binary @PrefixArguments format --files $expressionLambdaSource
+if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $expressionLambdaSource).Hash -ne $expressionLambdaHash) {
+    throw 'Expression lambda formatting changed on the second pass.'
+}
+$expressionLambdaExplanation = & $Binary @PrefixArguments explain-layout $expressionLambdaSource
+if ($LASTEXITCODE -ne 0 -or -not ($expressionLambdaExplanation -match 'rule = smoke-expression-lambdas;.*recipe = attached-expression-lambda')) {
+    throw 'The expression lambda recipe was not explained.'
 }
 $logicalLambdaFormatted = [IO.File]::ReadAllText($logicalLambdaSource)
 if (-not $logicalLambdaFormatted.Contains("        return entries.Any(entry =>`n            entry >= RequiredMinimumAllowedValue &&`n            (entry == RequiredPrimaryCategoryValue || entry == RequiredSecondaryCategoryValue) &&`n            entry != ExcludedPermissionCategoryValue);")) {
