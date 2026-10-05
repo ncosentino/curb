@@ -18,10 +18,13 @@ public class ExpressionLambdaLayoutTests
 		rules ??= Rules();
 		var first = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
 		first.Success.Should().BeTrue(first.Message);
+		first.Text.Should().NotBeNull();
 		first.Text!.TrimEnd('\r', '\n').Should().Be(expected);
-		var second = formatter.Format(first.Text, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		first.LayoutApplications.Should().NotBeEmpty();
+		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
+		formatter.RoundTripsChecked.Should().Be(2);
 	}
 
 	[Test]
@@ -131,8 +134,232 @@ public class ExpressionLambdaLayoutTests
 		var ordinary = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource, options);
 		ordinary.Success.Should().BeTrue(ordinary.Message);
 		ordinary.LayoutApplications.Should().BeEmpty();
-		var second = formatter.Format(ordinary.Text, options);
+		var second = formatter.Format(ordinary.Text!, options);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(ordinary.Text);
+	}
+
+	[Test]
+	public void Only_an_oversized_callback_header_breaks_after_the_call_opener()
+	{
+		const string source = "class C { object M() { return quiteLongCollectionName.Select(longCallbackParameter => longCallbackParameter.Id); } }";
+		const string expected = """
+			class C
+			{
+			    object M()
+			    {
+			        return quiteLongCollectionName.Select(
+			            longCallbackParameter =>
+			                longCallbackParameter.Id);
+			    }
+			}
+			""";
+		AssertLayout(source, expected, "max_line_length = 50");
+	}
+
+	[Test]
+	public void An_oversized_constructor_introducer_can_break_after_the_arrow()
+	{
+		const string source = "class C { object M() { return entries.Select(entry => new LongProjectionResultTypeName(entry.Id)); } }";
+		const string expected = """
+			class C
+			{
+			    object M()
+			    {
+			        return entries.Select(entry =>
+			            new LongProjectionResultTypeName(
+			                entry.Id
+			            ));
+			    }
+			}
+			""";
+		AssertLayout(source, expected, "max_line_length = 50");
+	}
+
+	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void Negated_and_parenthesized_if_conditions_keep_the_selected_callback_attached(bool parenthesized)
+	{
+		var source = ExpressionLambdaLayoutSamples.PatternSource.Replace("if (entries.Any(", parenthesized ? "if ((entries.Any(" : "if (!entries.Any(", StringComparison.Ordinal);
+		var expected = ExpressionLambdaLayoutSamples.PatternExpected.Replace("if (entries.Any(", parenthesized ? "if ((entries.Any(" : "if (!entries.Any(", StringComparison.Ordinal);
+		if (parenthesized)
+		{
+			source = source.Replace("NotApplicable)))", "NotApplicable))))", StringComparison.Ordinal);
+			expected = expected.Replace("NotApplicable)))", "NotApplicable))))", StringComparison.Ordinal);
+		}
+		AssertLayout(source, expected);
+	}
+
+	[Test]
+	public void Else_if_uses_the_actual_output_line_indent()
+	{
+		var source = ExpressionLambdaLayoutSamples.PatternSource.Replace("if (entries.Any", "if (ok) { Call(); } else if (entries.Any", StringComparison.Ordinal);
+		var expected = ExpressionLambdaLayoutSamples.PatternExpected.Replace("if (entries.Any", "if (ok)\n        {\n            Call();\n        }\n        else if (entries.Any", StringComparison.Ordinal);
+		AssertLayout(source, expected);
+	}
+
+	[Test]
+	public void Nested_projection_callbacks_share_header_handling_without_extra_body_indents()
+	{
+		const string source = "class C { object M() { return entries.Select(entry => nestedEntries.Select(nested => new SearchResult(nested.Id, Map(nested.CurrentValue), Map(nested.PreviousValue)))); } }";
+		const string expected = """
+			class C
+			{
+			    object M()
+			    {
+			        return entries.Select(entry => nestedEntries.Select(nested => new SearchResult(
+			            nested.Id,
+			            Map(nested.CurrentValue),
+			            Map(nested.PreviousValue)
+			        )));
+			    }
+			}
+			""";
+		AssertLayout(source, expected);
+	}
+
+	[Test]
+	public void Existing_logical_rules_and_expression_rules_have_disjoint_owners()
+	{
+		const string source = "class C { object M() { return entries.Where(entry => entry.IsEnabled && entry.HasRequiredPermission && entry.IsAvailable).Select(entry => new SearchResult(entry.Id, Map(entry.CurrentValue), Map(entry.PreviousValue))); } }";
+		var rules = new LayoutRuleSet(Rules().Rules.Concat([new LogicalLambdaLayoutRule("logical")]));
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var first = formatter.Format(source, options, layoutRules: rules);
+		first.Success.Should().BeTrue(first.Message);
+		first.LayoutApplications.Select(application => application.Recipe).Should().BeEquivalentTo(["hanging-logical-lambda", "attached-expression-lambda"]);
+		first.Text.Should().Contain("Where(entry =>\n");
+		first.Text.Should().Contain("Select(entry => new SearchResult(");
+		var second = formatter.Format(first.Text!, options, layoutRules: rules);
+		second.Success.Should().BeTrue(second.Message);
+		second.Text.Should().Be(first.Text);
+	}
+
+	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void Logical_condition_alignment_composes_with_pattern_callbacks(bool elseIf)
+	{
+		var source = ExpressionLambdaLayoutSamples.PatternSource.Replace("if (entries.Any", "if (entries is null || entries.Any", StringComparison.Ordinal);
+		if (elseIf)
+			source = source.Replace("if (entries is null", "if (ok) { Call(); } else if (entries is null", StringComparison.Ordinal);
+		var rules = new LayoutRuleSet(Rules().Rules.Concat([new LogicalConditionLayoutRule("conditions")]));
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var first = formatter.Format(source, options, layoutRules: rules);
+		first.Success.Should().BeTrue(first.Message);
+		var callIndent = new string(' ', elseIf ? 17 : 12);
+		first.Text.Should().Contain(callIndent + "entries.Any(entry =>\n" + callIndent
+			+ "    entry.Status is not (ResultStatus.Unavailable or ResultStatus.NotApplicable))\n        )");
+		first.LayoutApplications.Count.Should().Be(2);
+		var second = formatter.Format(first.Text!, options, layoutRules: rules);
+		second.Success.Should().BeTrue(second.Message);
+		second.Text.Should().Be(first.Text);
+	}
+
+	[Test]
+	public void Other_control_flow_headers_retain_their_existing_parenthesis_policy()
+	{
+		var source = ExpressionLambdaLayoutSamples.PatternSource.Replace("if (entries.Any", "while (entries.Any", StringComparison.Ordinal);
+		using var formatter = new CSharpFormatter();
+		var first = formatter.Format(source, TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
+		first.Success.Should().BeTrue(first.Message);
+		first.Text.Should().Contain("while (\n");
+		first.Text.Should().Contain("entries.Any(entry =>");
+		var second = formatter.Format(first.Text!, TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
+		second.Success.Should().BeTrue(second.Message);
+		second.Text.Should().Be(first.Text);
+	}
+
+	[Test]
+	[Arguments("max_line_length = off")]
+	[Arguments("csharp_keep_existing_linebreaks = true")]
+	[Arguments("csharp_space_around_binary_operators = ignore")]
+	public void Unsupported_modes_fail_without_output(string setting)
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource,
+			TestOptions.Parse(ExpressionLambdaLayoutSamples.Config + "\n" + setting), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain("Layout rule");
+	}
+
+	[Test]
+	[Arguments("entry =>", "entry /* seam */ =>")]
+	[Arguments("entry =>", "entry => /* seam */")]
+	[Arguments("Any(entry", "Any(/* seam */ entry")]
+	[Arguments("if (entries", "if (/* seam */ entries")]
+	[Arguments("NotApplicable)))", "NotApplicable) // close seam\n))")]
+	[Arguments("entry.Status", "\n#if FLAG\nentry.OtherStatus\n#else\nentry.Status\n#endif\n")]
+	public void Unsafe_moved_boundaries_fail_without_output(string before, string after)
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource.Replace(before, after, StringComparison.Ordinal),
+			TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain("trivia");
+	}
+
+	[Test]
+	public void Duplicate_rules_and_named_arguments_fail_explicitly()
+	{
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var duplicate = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource, options,
+			layoutRules: new LayoutRuleSet([new ExpressionLambdaLayoutRule("one"), new ExpressionLambdaLayoutRule("two")]));
+		duplicate.Status.Should().Be(FormatStatus.VerificationFailed);
+		duplicate.Text.Should().BeNull();
+		duplicate.Message.Should().Contain("same expression lambda");
+		var named = formatter.Format("class C { object M() { return entries.Select(selector: entry => entry.Id); } }", options, layoutRules: Rules());
+		named.Status.Should().Be(FormatStatus.VerificationFailed);
+		named.Text.Should().BeNull();
+		named.Message.Should().Contain("named or ref");
+	}
+
+	[Test]
+	[Arguments("\"sole-invocation-argument\"", "\"argument\"")]
+	[Arguments("\"nonlogical-expression\"", "\"any\"")]
+	[Arguments("\"inline-if-fits\"", "\"always-break\"")]
+	[Arguments("\"one-indent\"", "\"two-indents\"")]
+	[Arguments("\"with-body\"", "\"own-line\"")]
+	[Arguments("\"wrap\": \"if-long\",", "\"wrap\": \"if-long\", \"unknown\": true,")]
+	public void Unsupported_schema_values_fail_explicitly(string before, string after)
+	{
+		Action compile = () => LayoutRuleCompiler.Compile(Encoding.UTF8.GetBytes(
+			ExpressionLambdaLayoutSamples.Policy.Replace(before, after, StringComparison.Ordinal)));
+		compile.Should().Throw<LayoutRuleConfigurationException>();
+	}
+
+	[Test]
+	public void Source_suppression_precedes_callback_and_condition_layouts()
+	{
+		var source = ExpressionLambdaLayoutSamples.PatternSource.Replace("        if (entries", "#pragma warning disable IDE0055\n        if (entries", StringComparison.Ordinal)
+			.Replace("        return true;", "#pragma warning restore IDE0055\n        return true;", StringComparison.Ordinal);
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var ordinary = formatter.Format(source, options);
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		var selected = formatter.Format(source, options, layoutRules: Rules());
+		selected.Success.Should().BeTrue(selected.Message);
+		selected.Text.Should().Be(ordinary.Text);
+		selected.LayoutApplications.Should().BeEmpty();
+	}
+
+	[Test]
+	[Arguments(false, "\n")]
+	[Arguments(true, "\n")]
+	[Arguments(false, "\r\n")]
+	[Arguments(true, "\r\n")]
+	public void Output_indentation_and_line_endings_are_byte_stable(bool tabs, string ending)
+	{
+		var expected = (tabs ? ExpressionLambdaLayoutSamples.PatternExpected.Replace("    ", "\t", StringComparison.Ordinal)
+			: ExpressionLambdaLayoutSamples.PatternExpected).ReplaceLineEndings(ending);
+		AssertLayout(ExpressionLambdaLayoutSamples.PatternSource.ReplaceLineEndings(ending), expected,
+			$"indent_style = {(tabs ? "tab" : "space")}\nend_of_line = {(ending == "\n" ? "lf" : "crlf")}");
 	}
 }
