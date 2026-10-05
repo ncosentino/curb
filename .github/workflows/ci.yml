@@ -63,7 +63,7 @@ jobs:
       - name: Exercise the managed CLI and compiler reference
         shell: pwsh
         run: |
-          $dotnet = (Get-Command dotnet -CommandType Application).Source
+          $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source
           $dll = Join-Path $PWD '.artifacts' 'bin' 'Nullean.Curb.Cli' 'release' 'curb.dll'
           ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $dotnet -PrefixArguments @($dll) -TestDirectory (Join-Path $env:RUNNER_TEMP 'managed-layout-rules')
 

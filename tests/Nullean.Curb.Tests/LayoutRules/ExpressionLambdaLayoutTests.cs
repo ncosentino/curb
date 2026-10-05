@@ -19,9 +19,9 @@ public class ExpressionLambdaLayoutTests
 		var first = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
 		first.Success.Should().BeTrue(first.Message);
 		first.Text.Should().NotBeNull();
-		first.Text!.TrimEnd('\r', '\n').Should().Be(expected);
+		first.Text.TrimEnd('\r', '\n').Should().Be(expected);
 		first.LayoutApplications.Should().NotBeEmpty();
-		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		var second = formatter.Format(first.Text, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 		formatter.RoundTripsChecked.Should().Be(2);
@@ -166,6 +166,43 @@ public class ExpressionLambdaLayoutTests
 	}
 
 	[Test]
+	[Arguments("csharp_wrap_arguments_style = chop_always")]
+	[Arguments("csharp_max_invocation_arguments_on_line = 1")]
+	public void Constructor_arguments_retain_their_forced_wrapping_policy(string setting)
+	{
+		const string source = "class C { object M() { return entries.Select(entry => new Pair(entry.Id, entry.Name)); } }";
+		const string expected = """
+			class C
+			{
+			    object M()
+			    {
+			        return entries.Select(entry => new Pair(
+			            entry.Id,
+			            entry.Name
+			        ));
+			    }
+			}
+			""";
+		AssertLayout(source, expected, setting);
+	}
+
+	[Test]
+	public void Attributed_typed_headers_share_the_existing_width_driven_printer()
+	{
+		const string source = "class C { object M() { return entries.Select([Marker] static object (Entry entry) => entry.Id); } }";
+		const string expected = """
+			class C
+			{
+			    object M()
+			    {
+			        return entries.Select([Marker] static object (Entry entry) => entry.Id);
+			    }
+			}
+			""";
+		AssertLayout(source, expected);
+	}
+
+	[Test]
 	public void Absence_of_the_recipe_preserves_the_default_path()
 	{
 		using var formatter = new CSharpFormatter();
@@ -274,7 +311,7 @@ public class ExpressionLambdaLayoutTests
 		first.Success.Should().BeTrue(first.Message);
 		first.Text.Should().Contain("/* interior */");
 		first.LayoutApplications.Should().ContainSingle();
-		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: Rules());
+		var second = formatter.Format(first.Text, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: Rules());
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 	}
@@ -300,7 +337,7 @@ public class ExpressionLambdaLayoutTests
 		first.Success.Should().BeTrue(first.Message);
 		first.LayoutApplications.Count.Should().Be(2);
 		first.Text.Should().Contain("content");
-		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		var second = formatter.Format(first.Text, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 	}
@@ -317,7 +354,7 @@ public class ExpressionLambdaLayoutTests
 		first.Success.Should().BeTrue(first.Message);
 		first.LayoutApplications.Count.Should().Be(2);
 		first.Text.Should().Contain("Select(entry => new SearchResult(");
-		var second = formatter.Format(first.Text!, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
+		var second = formatter.Format(first.Text, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 	}
@@ -334,7 +371,7 @@ public class ExpressionLambdaLayoutTests
 		first.LayoutApplications.Select(application => application.Recipe).Should().BeEquivalentTo(["hanging-logical-lambda", "attached-expression-lambda"]);
 		first.Text.Should().Contain("Where(entry =>\n");
 		first.Text.Should().Contain("Select(entry => new SearchResult(");
-		var second = formatter.Format(first.Text!, options, layoutRules: rules);
+		var second = formatter.Format(first.Text, options, layoutRules: rules);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 	}
@@ -356,7 +393,7 @@ public class ExpressionLambdaLayoutTests
 		first.Text.Should().Contain(callIndent + "entries.Any(entry =>\n" + callIndent
 			+ "    entry.Status is not (ResultStatus.Unavailable or ResultStatus.NotApplicable))\n        )");
 		first.LayoutApplications.Count.Should().Be(2);
-		var second = formatter.Format(first.Text!, options, layoutRules: rules);
+		var second = formatter.Format(first.Text, options, layoutRules: rules);
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 	}
@@ -370,7 +407,7 @@ public class ExpressionLambdaLayoutTests
 		first.Success.Should().BeTrue(first.Message);
 		first.Text.Should().Contain("while (\n");
 		first.Text.Should().Contain("entries.Any(entry =>");
-		var second = formatter.Format(first.Text!, TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
+		var second = formatter.Format(first.Text, TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
 		second.Success.Should().BeTrue(second.Message);
 		second.Text.Should().Be(first.Text);
 	}

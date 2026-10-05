@@ -108,6 +108,7 @@ internal static partial class Printers
 					}
 					else if (LambdaBodyHasOwnBreaks(body))
 					{
+						// Measure the body prefix up to its first break without flattening its internal groups.
 						var bodyHeader = arena.NextGroupId();
 						using (arena.Group(bodyHeader))
 						using (arena.Indent())
