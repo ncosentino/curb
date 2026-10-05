@@ -20,6 +20,7 @@ public sealed class LayoutRuleSet
 		var index = new Dictionary<string, List<WrapperLayoutRule>>(StringComparer.Ordinal);
 		var conditions = new List<LogicalConditionLayoutRule>();
 		var logicalLambdas = new List<LogicalLambdaLayoutRule>();
+		var expressionLambdas = new List<ExpressionLambdaLayoutRule>();
 		var rawStrings = new List<MultilineRawStringLayoutRule>();
 		var stringConcatenations = new List<StringConcatenationLayoutRule>();
 		foreach (var rule in entries)
@@ -30,6 +31,11 @@ public sealed class LayoutRuleSet
 			if (rule is LogicalLambdaLayoutRule logicalLambda)
 			{
 				logicalLambdas.Add(logicalLambda);
+				continue;
+			}
+			if (rule is ExpressionLambdaLayoutRule expressionLambda)
+			{
+				expressionLambdas.Add(expressionLambda);
 				continue;
 			}
 			if (rule is LogicalConditionLayoutRule condition)
@@ -60,6 +66,7 @@ public sealed class LayoutRuleSet
 		Rules = Array.AsReadOnly(entries);
 		Conditions = conditions.AsReadOnly();
 		LogicalLambdas = logicalLambdas.AsReadOnly();
+		ExpressionLambdas = expressionLambdas.AsReadOnly();
 		RawStrings = rawStrings.AsReadOnly();
 		StringConcatenations = stringConcatenations.AsReadOnly();
 	}
@@ -70,6 +77,8 @@ public sealed class LayoutRuleSet
 	internal IReadOnlyList<LogicalConditionLayoutRule> Conditions { get; }
 
 	internal IReadOnlyList<LogicalLambdaLayoutRule> LogicalLambdas { get; }
+
+	internal IReadOnlyList<ExpressionLambdaLayoutRule> ExpressionLambdas { get; }
 
 	internal IReadOnlyList<MultilineRawStringLayoutRule> RawStrings { get; }
 
