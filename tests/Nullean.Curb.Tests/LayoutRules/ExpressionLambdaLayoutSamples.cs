@@ -56,7 +56,6 @@ internal static class ExpressionLambdaLayoutSamples
 		        {
 		            return false;
 		        }
-
 		        return true;
 		    }
 		}
