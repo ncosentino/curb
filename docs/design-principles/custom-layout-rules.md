@@ -258,6 +258,24 @@ Logical operators trail their operands, and the closing parenthesis remains besi
 the final operand. Explicit parentheses and precedence remain unchanged. Short operand
 calls remain intact; genuinely oversized operands use ordinary internal wrapping.
 
+When the selected invocation is an `if` or `else if` condition, the recipe retains
+the call beside the keyword and keeps the enclosing closing parenthesis beside the
+final operand:
+
+```csharp
+if (entries.Any(entry =>
+    entry.IsArchived ||
+    entry.IsBlocked))
+{
+    return false;
+}
+```
+
+This coordination also handles parenthesized and negated conditions. It requires
+only the logical-lambda rule, not a logical-condition or expression-lambda rule.
+Other control-flow keywords retain their existing header layout. A top-level
+logical condition still uses the logical-condition recipe when configured.
+
 The recipe requires a finite width and deterministic layout. It composes with logical
 `if` headers and wrapper delegated bodies. Nested lambdas do not inherit the outer
 predicate's logical layout context. String-concatenation selection remains restricted
@@ -325,8 +343,9 @@ header breaks after the invocation opener. Constructor and nested invocation arg
 retain their configured wrapping policy. Selected parenthesized lambda headers use width
 rather than forced parameter chopping; ordinary declarations remain unchanged.
 
-The rule coordinates enclosing `if` and `else if` parentheses for a selected invocation,
-including parenthesized and negated forms. Other control-flow keywords keep their existing
+Both callback recipes share coordination of enclosing `if` and `else if` parentheses
+for a selected invocation, including parenthesized and negated forms.
+Other control-flow keywords keep their existing
 header layout. A logical condition chain still uses the logical-condition recipe.
 Continuation indentation follows the actual output line, including aligned operands,
 tabs and `else if` columns.

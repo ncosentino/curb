@@ -17,4 +17,16 @@ internal static class LogicalLambdaSample
         if (entries is null || entries.Any(entry => string.IsNullOrWhiteSpace(entry) || entry.StartsWith("invalid-", StringComparison.OrdinalIgnoreCase) || entry.EndsWith("-rejected", StringComparison.OrdinalIgnoreCase))) { return true; }
         return false;
     }
+
+    internal static bool Rejects(IEnumerable<string> entries)
+    {
+        if (entries.Any(entry => string.IsNullOrWhiteSpace(entry) || entry.StartsWith("invalid-", StringComparison.OrdinalIgnoreCase))) { return true; }
+        return false;
+    }
+
+    internal static bool AllMatch(IEnumerable<int> entries)
+    {
+        if (entries.All(entry => entry >= RequiredMinimumAllowedValue && (entry == RequiredPrimaryCategoryValue || entry == RequiredSecondaryCategoryValue) && entry != ExcludedPermissionCategoryValue)) { return true; }
+        return false;
+    }
 }

@@ -8,8 +8,28 @@ namespace Nullean.Curb.Tests.LayoutRules;
 
 public class ExpressionLambdaLayoutTests
 {
+	private const string LogicalConditionSource = "class C { void M() { if (entries.Any(entry => entry.ConditionType != RequiredConditionType || entry.Operator != RequiredOperator)) { Call(); } } }";
+
+	private const string LogicalConditionExpected = """
+		class C
+		{
+		    void M()
+		    {
+		        if (entries.Any(entry =>
+		            entry.ConditionType != RequiredConditionType ||
+		            entry.Operator != RequiredOperator))
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""";
+
 	private static LayoutRuleSet Rules() =>
 		new(LayoutRuleCompiler.Compile(Encoding.UTF8.GetBytes(ExpressionLambdaLayoutSamples.Policy)).Select(definition => definition.Rule));
+
+	private static LayoutRuleSet LogicalRules(bool includeExpressionRule = false) =>
+		new((includeExpressionRule ? Rules().Rules : []).Append(new LogicalLambdaLayoutRule("logical-lambdas")));
 
 	private static void AssertLayout(string source, string expected, string? settings = null, LayoutRuleSet? rules = null)
 	{
@@ -41,6 +61,165 @@ public class ExpressionLambdaLayoutTests
 	[Test]
 	public void Projections_keep_the_constructor_introducer_attached() =>
 		AssertLayout(ExpressionLambdaLayoutSamples.ProjectionSource, ExpressionLambdaLayoutSamples.ProjectionExpected);
+
+	[Test]
+	[Arguments("Any", false)]
+	[Arguments("Any", true)]
+	[Arguments("All", false)]
+	[Arguments("All", true)]
+	public void Logical_callbacks_keep_the_enclosing_if_attached(string callee, bool includeExpressionRule) =>
+		AssertLayout(LogicalConditionSource.Replace(".Any(", "." + callee + "(", StringComparison.Ordinal),
+			LogicalConditionExpected.Replace(".Any(", "." + callee + "(", StringComparison.Ordinal),
+			"max_line_length = 80", LogicalRules(includeExpressionRule));
+
+	[Test]
+	public void Expanded_logical_conditions_converge_to_the_attached_layout() =>
+		AssertLayout(LogicalConditionSource.Replace("if (entries.Any(", "if (\nentries.Any(", StringComparison.Ordinal)
+			.Replace("RequiredOperator))", "RequiredOperator)\n)", StringComparison.Ordinal),
+			LogicalConditionExpected, "max_line_length = 80", LogicalRules());
+
+	[Test]
+	[Arguments(false)]
+	[Arguments(true)]
+	public void Logical_all_conditions_delegate_oversized_operand_arguments(bool includeExpressionRule)
+	{
+		const string source = "class C { void M() { if (entries.All(entry => entry.IsEnabled && entry.HasRequiredPermission && MatchesRequiredCategory(entry.PrimaryCategory, entry.SecondaryCategory, StringComparison.OrdinalIgnoreCase))) { Call(); } } }";
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (entries.All(entry =>
+			            entry.IsEnabled &&
+			            entry.HasRequiredPermission &&
+			            MatchesRequiredCategory(
+			                entry.PrimaryCategory,
+			                entry.SecondaryCategory,
+			                StringComparison.OrdinalIgnoreCase
+			            )))
+			        {
+			            Call();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(source, expected, "max_line_length = 80", LogicalRules(includeExpressionRule));
+	}
+
+	[Test]
+	[Arguments("", false)]
+	[Arguments("!", false)]
+	[Arguments("(", false)]
+	[Arguments("", true)]
+	[Arguments("!", true)]
+	[Arguments("(", true)]
+	public void Logical_condition_coordination_preserves_negation_parentheses_and_else_if(string prefix, bool elseIf)
+	{
+		var source = LogicalConditionSource.Replace("if (entries", "if (" + prefix + "entries", StringComparison.Ordinal);
+		var expected = LogicalConditionExpected.Replace("if (entries", "if (" + prefix + "entries", StringComparison.Ordinal);
+		if (prefix == "(")
+		{
+			source = source.Replace("RequiredOperator))", "RequiredOperator)))", StringComparison.Ordinal);
+			expected = expected.Replace("RequiredOperator))", "RequiredOperator)))", StringComparison.Ordinal);
+		}
+		if (elseIf)
+		{
+			source = source.Replace("if (", "if (ok) { First(); } else if (", StringComparison.Ordinal);
+			expected = expected.Replace("        if (", "        if (ok)\n        {\n            First();\n        }\n        else if (", StringComparison.Ordinal);
+		}
+		AssertLayout(source, expected, "max_line_length = 80", LogicalRules());
+	}
+
+	[Test]
+	[Arguments(36, false)]
+	[Arguments(35, true)]
+	public void Logical_condition_width_counts_the_enclosing_delimiter(int width, bool broken)
+	{
+		var condition = broken ? "if (xs.Any(x =>\n            x.A &&\n            x.B))" : "if (xs.Any(x => x.A && x.B))";
+		var expected = $$"""
+			class C
+			{
+			    void M()
+			    {
+			        {{condition}}
+			        {
+			            Call();
+			        }
+			    }
+			}
+			""";
+		AssertLayout("class C { void M() { if (xs.Any(x => x.A && x.B)) { Call(); } } }", expected,
+			$"max_line_length = {width}", LogicalRules());
+	}
+
+	[Test]
+	[Arguments(false, "\n")]
+	[Arguments(true, "\n")]
+	[Arguments(false, "\r\n")]
+	[Arguments(true, "\r\n")]
+	public void Logical_condition_output_indentation_and_endings_are_byte_stable(bool tabs, string ending)
+	{
+		var expected = (tabs ? LogicalConditionExpected.Replace("    ", "\t", StringComparison.Ordinal)
+			: LogicalConditionExpected).ReplaceLineEndings(ending);
+		AssertLayout(LogicalConditionSource.ReplaceLineEndings(ending), expected,
+			$"max_line_length = 80\nindent_style = {(tabs ? "tab" : "space")}\nend_of_line = {(ending == "\n" ? "lf" : "crlf")}",
+			LogicalRules());
+	}
+
+	[Test]
+	[Arguments("if (entries", "if (/* seam */ entries")]
+	[Arguments("if (entries", "if /* seam */ (entries")]
+	[Arguments("RequiredOperator))", "RequiredOperator) /* seam */ )")]
+	public void Logical_condition_boundary_trivia_fails_without_output(string before, string after)
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(LogicalConditionSource.Replace(before, after, StringComparison.Ordinal),
+			TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: LogicalRules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain("condition-boundary trivia");
+	}
+
+	[Test]
+	public void Logical_condition_coordination_requires_a_selected_callback()
+	{
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var ordinary = formatter.Format(LogicalConditionSource, options);
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		var nonmatching = formatter.Format(LogicalConditionSource, options, layoutRules: Rules());
+		nonmatching.Success.Should().BeTrue(nonmatching.Message);
+		nonmatching.Text.Should().Be(ordinary.Text);
+		nonmatching.LayoutApplications.Should().BeEmpty();
+	}
+
+	[Test]
+	public void Expression_condition_closing_seams_fail_without_output()
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format("class C { void M() { if (xs.Any(x => x.A) /* seam */ ) { Call(); } } }",
+			TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain("condition-boundary trivia");
+	}
+
+	[Test]
+	public void Suppression_precedes_logical_condition_coordination()
+	{
+		var source = LogicalConditionSource.Replace("if (entries", "\n#pragma warning disable IDE0055\nif (entries", StringComparison.Ordinal)
+			.Replace("} } }", "}\n#pragma warning restore IDE0055\n} }", StringComparison.Ordinal);
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		var ordinary = formatter.Format(source, options);
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		var selected = formatter.Format(source, options, layoutRules: LogicalRules());
+		selected.Success.Should().BeTrue(selected.Message);
+		selected.Text.Should().Be(ordinary.Text);
+		selected.LayoutApplications.Should().BeEmpty();
+	}
 
 	[Test]
 	public void Already_expanded_input_converges_to_the_same_pattern_layout() =>

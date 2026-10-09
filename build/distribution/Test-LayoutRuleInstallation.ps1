@@ -71,8 +71,19 @@ if (-not $logicalLambdaFormatted.Contains("        return entries.Any(entry =>`n
 if (-not $logicalLambdaFormatted.Contains("        if (entries is null ||`n            entries.Any(entry =>`n                string.IsNullOrWhiteSpace(entry) ||`n                entry.StartsWith(`"invalid-`", StringComparison.OrdinalIgnoreCase) ||`n                entry.EndsWith(`"-rejected`", StringComparison.OrdinalIgnoreCase))`n        )")) {
     throw 'The logical lambda body did not indent from the aligned condition operand.'
 }
+if (-not $logicalLambdaFormatted.Contains("        if (entries.Any(entry =>`n            string.IsNullOrWhiteSpace(entry) ||`n            entry.StartsWith(`"invalid-`", StringComparison.OrdinalIgnoreCase)))")) {
+    throw 'The logical Any callback did not retain its enclosing if header and compact closing delimiters.'
+}
+if (-not $logicalLambdaFormatted.Contains("        if (entries.All(entry =>`n            entry >= RequiredMinimumAllowedValue &&`n            (entry == RequiredPrimaryCategoryValue || entry == RequiredSecondaryCategoryValue) &&`n            entry != ExcludedPermissionCategoryValue))")) {
+    throw 'The logical All callback did not retain its enclosing if header and compact closing delimiters.'
+}
 & $Binary @PrefixArguments check --files $logicalLambdaSource
 if ($LASTEXITCODE -ne 0) { throw "Logical lambda output is not a fixed point: $LASTEXITCODE" }
+$logicalLambdaHash = (Get-FileHash -LiteralPath $logicalLambdaSource).Hash
+& $Binary @PrefixArguments format --files $logicalLambdaSource
+if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $logicalLambdaSource).Hash -ne $logicalLambdaHash) {
+    throw 'Logical lambda formatting changed on the second pass.'
+}
 $logicalLambdaExplanation = & $Binary @PrefixArguments explain-layout $logicalLambdaSource
 if ($LASTEXITCODE -ne 0 -or -not ($logicalLambdaExplanation -match 'rule = smoke-logical-lambdas;.*recipe = hanging-logical-lambda')) {
     throw 'The logical lambda recipe was not explained.'
