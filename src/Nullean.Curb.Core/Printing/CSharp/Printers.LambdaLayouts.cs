@@ -223,6 +223,7 @@ internal static partial class Printers
 			return false;
 		if (node.Condition.ContainsDirectives || HasAnyTrivia(node.OpenParenToken)
 			|| HasTrailingLambdaContent(node.IfKeyword)
+			|| HasTrailingLambdaContent(node.Condition.GetLastToken())
 			|| TokenPrinter.HasLeadingContent(node.CloseParenToken))
 			throw new LayoutRuleException($"Layout rule '{capture.Rule.Id}' encountered unsupported condition-boundary trivia.");
 		TokenPrinter.Print(node.IfKeyword, context);

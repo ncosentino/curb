@@ -195,6 +195,18 @@ public class ExpressionLambdaLayoutTests
 	}
 
 	[Test]
+	public void Expression_condition_closing_seams_fail_without_output()
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format("class C { void M() { if (xs.Any(x => x.A) /* seam */ ) { Call(); } } }",
+			TestOptions.Parse(ExpressionLambdaLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain("condition-boundary trivia");
+	}
+
+	[Test]
 	public void Suppression_precedes_logical_condition_coordination()
 	{
 		var source = LogicalConditionSource.Replace("if (entries", "\n#pragma warning disable IDE0055\nif (entries", StringComparison.Ordinal)
