@@ -205,21 +205,21 @@ internal static partial class Printers
 			_ => BreaksWithoutHelp(body),
 		};
 
-	private static bool TryPrintExpressionLambdaCondition(IfStatementSyntax node, PrintContext context)
+	private static bool TryPrintLambdaCondition(IfStatementSyntax node, PrintContext context)
 	{
-		if (context.LayoutRules?.ExpressionLambdas is not { Count: > 0 })
+		if (context.LayoutRules is not { } rules
+			|| (rules.LogicalLambdas.Count == 0 && rules.ExpressionLambdas.Count == 0))
 			return false;
 		ExpressionSyntax expression = node.Condition;
 		var budget = 511;
 		while (expression is ParenthesizedExpressionSyntax or PrefixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.LogicalNotExpression })
 		{
 			if (--budget == 0)
-				throw new LayoutRuleException("An expression-lambda condition exceeds the header budget.");
+				throw new LayoutRuleException("A selected lambda condition exceeds the header budget.");
 			expression = expression is ParenthesizedExpressionSyntax parenthesized ? parenthesized.Expression : ((PrefixUnaryExpressionSyntax)expression).Operand;
 		}
 		if (expression is not InvocationExpressionSyntax invocation
-			|| !TryCaptureLambdaLayout(invocation.ArgumentList, context, out var capture)
-			|| capture.Rule is not ExpressionLambdaLayoutRule)
+			|| !TryCaptureLambdaLayout(invocation.ArgumentList, context, out var capture))
 			return false;
 		if (node.Condition.ContainsDirectives || HasAnyTrivia(node.OpenParenToken)
 			|| HasTrailingLambdaContent(node.IfKeyword)
