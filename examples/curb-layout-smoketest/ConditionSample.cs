@@ -45,6 +45,17 @@ internal static class ConditionSample
         return false;
     }
 
+    internal static bool IsReturnedFrameBand(SensorFrame primaryReferenceFrame, SensorFrame secondaryReferenceFrame, bool usePrimaryReferenceFrame)
+    {
+        if (SelectReferenceFrame(primaryReferenceFrame, secondaryReferenceFrame, usePrimaryReferenceFrame) is { Temperature: > MinimumCalibrationTemperature, Humidity: < MaximumCalibrationHumidity } accepted) { return accepted.Temperature > accepted.Humidity; }
+        return false;
+    }
+
+    private static SensorFrame SelectReferenceFrame(SensorFrame primaryReferenceFrame, SensorFrame secondaryReferenceFrame, bool usePrimaryReferenceFrame)
+    {
+        return usePrimaryReferenceFrame ? primaryReferenceFrame : secondaryReferenceFrame;
+    }
+
     internal static bool IsReferenceKind(CalibrationKind kind)
     {
         if (kind is CalibrationKind.PrimaryReference or CalibrationKind.SecondaryReference or CalibrationKind.BackupReference) { return true; }

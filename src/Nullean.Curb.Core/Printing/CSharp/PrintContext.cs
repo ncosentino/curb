@@ -34,6 +34,8 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 
 	public SyntaxNode? AttachedConditionRoot { get; set; }
 
+	public IsPatternExpressionSyntax? AttachedPropertyRoot { get; set; }
+
 	public bool IsInAttachedCondition(SyntaxNode node) => IsWithinLayoutRoot(node, AttachedConditionRoot, stopAtArguments: true);
 
 	public bool IntersectsSuppression(TextSpan owner)

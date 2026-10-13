@@ -19,6 +19,18 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
 
+		if (context.IsInAttachedCondition(node) && ContainsAttachedPropertyPattern(node.Pattern))
+		{
+			using (context.Arena.IndentIf(!ReferenceEquals(node, context.AttachedPropertyRoot)))
+			{
+				if (BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
+					Node.Print(node.Pattern, context);
+				else
+					PrintAttachedPatternGap(node.Pattern, context, alreadyIndented: true);
+			}
+			return;
+		}
+
 		// A bare recursive pattern (`is { ... }`, no type or positional clause ahead of the brace) that
 		// the author kept on the `is` line owns the gap to its own opening brace: that gap answers the
 		// same fits question as whether the property list wraps, so RecursivePattern controls it with a

@@ -45,11 +45,15 @@ internal static partial class Printers
 			};
 		}
 
+		var propertyRoot = root is IsPatternExpressionSyntax patternExpression
+			&& ContainsAttachedPropertyPattern(patternExpression.Pattern) ? patternExpression : null;
 		var arena = context.Arena;
 		var opening = arena.NextGroupId();
 		var previousRoot = context.AttachedConditionRoot;
+		var previousPropertyRoot = context.AttachedPropertyRoot;
 		var previousIndent = context.IndentedCondition;
 		context.AttachedConditionRoot = node.Condition;
+		context.AttachedPropertyRoot = propertyRoot;
 		context.IndentedCondition = null;
 		try
 		{
@@ -61,6 +65,8 @@ internal static partial class Printers
 			using (arena.Indent())
 				Spacing.InsideControlFlowParensBreakable(context);
 			using (arena.IndentIfBroken(opening))
+			using (arena.IndentIf(context.AttachedPropertyRoot is not null))
+			using (arena.IndentIfBroken(opening, context.AttachedPropertyRoot is not null ? -1 : 0))
 			{
 				Node.Print(node.Condition, context);
 				Spacing.InsideControlFlowParens(context);
@@ -75,20 +81,33 @@ internal static partial class Printers
 		finally
 		{
 			context.AttachedConditionRoot = previousRoot;
+			context.AttachedPropertyRoot = previousPropertyRoot;
 			context.IndentedCondition = previousIndent;
 		}
 		context.AppliedLayout(rule, header);
 		return true;
 	}
 
-	private static void PrintAttachedPatternGap(PatternSyntax pattern, PrintContext context)
+	private static bool ContainsAttachedPropertyPattern(PatternSyntax pattern)
+	{
+		var budget = 511;
+		while (pattern is UnaryPatternSyntax or ParenthesizedPatternSyntax)
+		{
+			if (--budget == 0)
+				throw new LayoutRuleException("A selected condition pattern exceeds the 511-node budget.");
+			pattern = pattern is UnaryPatternSyntax unary ? unary.Pattern : ((ParenthesizedPatternSyntax)pattern).Pattern;
+		}
+		return pattern is RecursivePatternSyntax { PropertyPatternClause.Subpatterns.Count: > 0 };
+	}
+
+	private static void PrintAttachedPatternGap(PatternSyntax pattern, PrintContext context, bool alreadyIndented = false)
 	{
 		var arena = context.Arena;
 		var gap = arena.NextGroupId();
 		using (arena.Group(gap))
-		using (arena.Indent())
+		using (arena.IndentIf(!alreadyIndented))
 			arena.Line();
-		using (arena.IndentIfBroken(gap))
+		using (arena.IndentIfBroken(gap, alreadyIndented ? 0 : 1))
 			Node.Print(pattern, context);
 	}
 
