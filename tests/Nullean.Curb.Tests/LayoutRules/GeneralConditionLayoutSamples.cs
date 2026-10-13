@@ -6,6 +6,7 @@ internal static class GeneralConditionLayoutSamples
 		max_line_length = 50
 		csharp_keep_existing_linebreaks = false
 		csharp_wrap_arguments_style = chop_if_long
+		end_of_line = lf
 		""";
 
 	internal const string Policy = """

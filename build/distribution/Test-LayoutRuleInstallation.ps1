@@ -59,7 +59,9 @@ foreach ($fragment in @(
     "        if (StringComparer.OrdinalIgnoreCase.Compare(`n            primaryCalibrationLabel.Trim(),`n            secondaryCalibrationLabel.Trim()`n        ) < 0)",
     "        if (!(reading.Temperature == RequiredPrimaryReferenceTemperature ||`n            reading.Humidity == RequiredSecondaryReferenceHumidity))"
 )) {
-    if (-not $conditionFormatted.Contains($fragment)) { throw 'A general condition family did not retain its exact selected layout.' }
+    if (-not $conditionFormatted.Contains($fragment)) {
+        throw "The public condition fixture did not retain its required layout.`nExpected fragment:`n$fragment`nActual fixture:`n$conditionFormatted"
+    }
 }
 & $Binary @PrefixArguments check --files $conditionSource
 if ($LASTEXITCODE -ne 0) { throw "General condition output is not a fixed point: $LASTEXITCODE" }
