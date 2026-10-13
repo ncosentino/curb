@@ -21,6 +21,30 @@ internal static class ConditionSample
         return false;
     }
 
+    internal static bool IsTypedCalibrationBand(object reading)
+    {
+        if (reading is SensorFrame { Temperature: > MinimumCalibrationTemperature, Humidity: < MaximumCalibrationHumidity } accepted) { return accepted.Temperature > accepted.Humidity; }
+        return false;
+    }
+
+    internal static bool IsNotCalibrationBand(object reading)
+    {
+        if (reading is not SensorFrame { Temperature: > MinimumCalibrationTemperature, Humidity: < MaximumCalibrationHumidity }) { return true; }
+        return false;
+    }
+
+    internal static bool HasNestedCalibrationBand(SensorFrame reading)
+    {
+        if (reading is { Payload: { Temperature: > RequiredPrimaryReferenceTemperature, Humidity: < RequiredSecondaryReferenceHumidity } } accepted) { return accepted.Payload.Temperature > accepted.Payload.Humidity; }
+        return false;
+    }
+
+    internal static bool MatchesReferenceShape(object reading)
+    {
+        if (reading is SensorFrame(RequiredPrimaryReferenceTemperature, RequiredSecondaryReferenceHumidity, CalibrationKind.BackupReference) { Temperature: > MinimumCalibrationTemperature }) { return true; }
+        return false;
+    }
+
     internal static bool IsReferenceKind(CalibrationKind kind)
     {
         if (kind is CalibrationKind.PrimaryReference or CalibrationKind.SecondaryReference or CalibrationKind.BackupReference) { return true; }

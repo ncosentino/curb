@@ -63,6 +63,14 @@ public class GeneralConditionLayoutTests
 	}
 
 	[Test]
+	public void Detached_pattern_types_do_not_double_indent_their_braces()
+	{
+		var condition = GeneralConditionLayoutSamples.Property.Replace("reading is {", "reading is SensorFrame {", StringComparison.Ordinal);
+		var expected = GeneralConditionLayoutSamples.PropertyExpected.Replace("reading is\n", "reading is\n            SensorFrame\n", StringComparison.Ordinal);
+		AssertLayout(GeneralConditionLayoutSamples.Source(condition), expected, "max_line_length = 34");
+	}
+
+	[Test]
 	[Arguments("is null")]
 	[Arguments("is not null")]
 	[Arguments("is SensorFrame frame")]
@@ -482,13 +490,13 @@ public class GeneralConditionLayoutTests
 			    void M()
 			    {
 			        if (reading is
-			        {
-			            Payload:
 			            {
-			                Temperature: > 20,
-			                Humidity: < 80
-			            }
-			        } accepted)
+			                Payload:
+			                {
+			                    Temperature: > 20,
+			                    Humidity: < 80
+			                }
+			            } accepted)
 			        {
 			            Use();
 			        }

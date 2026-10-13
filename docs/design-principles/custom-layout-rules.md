@@ -264,10 +264,10 @@ Pattern and expression grouping, designations, argument values and token order a
 
 ```csharp
 if (reading is
-{
-    Temperature: > 20,
-    Humidity: < 80
-} accepted)
+    {
+        Temperature: > 20,
+        Humidity: < 80
+    } accepted)
 {
     Use(accepted);
 }

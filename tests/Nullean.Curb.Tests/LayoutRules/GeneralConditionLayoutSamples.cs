@@ -54,10 +54,10 @@ internal static class GeneralConditionLayoutSamples
 		    void M()
 		    {
 		        if (reading is
-		        {
-		            Temperature: > 20,
-		            Humidity: < 80
-		        } accepted)
+		            {
+		                Temperature: > 20,
+		                Humidity: < 80
+		            } accepted)
 		        {
 		            Use();
 		        }

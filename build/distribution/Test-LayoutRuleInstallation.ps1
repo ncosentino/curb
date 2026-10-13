@@ -51,7 +51,10 @@ if ($PackageVersion) {
 }
 $conditionFormatted = [IO.File]::ReadAllText($conditionSource)
 foreach ($fragment in @(
-    "        if (reading is`n        {`n            Temperature: > MinimumCalibrationTemperature,`n            Humidity: < MaximumCalibrationHumidity`n        } accepted)",
+    "        if (reading is`n            {`n                Temperature: > MinimumCalibrationTemperature,`n                Humidity: < MaximumCalibrationHumidity`n            } accepted)",
+    "        if (reading is SensorFrame`n            {`n                Temperature: > MinimumCalibrationTemperature,`n                Humidity: < MaximumCalibrationHumidity`n            } accepted)",
+    "        if (reading is not SensorFrame`n            {`n                Temperature: > MinimumCalibrationTemperature,`n                Humidity: < MaximumCalibrationHumidity`n            })",
+    "        if (reading is`n            {`n                Payload:`n                {`n                    Temperature: > RequiredPrimaryReferenceTemperature,`n                    Humidity: < RequiredSecondaryReferenceHumidity`n                }`n            } accepted)",
     "        if (string.Equals(`n            primaryCalibrationLabel.Trim(),`n            secondaryCalibrationLabel.Trim(),`n            StringComparison.OrdinalIgnoreCase`n        ))",
     "        if (kind is CalibrationKind.PrimaryReference or`n            CalibrationKind.SecondaryReference or`n            CalibrationKind.BackupReference)",
     "        if (reading is SensorFrame(`n            RequiredPrimaryReferenceTemperature,`n            RequiredSecondaryReferenceHumidity,`n            CalibrationKind.BackupReference`n        ))",
