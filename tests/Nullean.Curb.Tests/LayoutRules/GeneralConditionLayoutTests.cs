@@ -115,7 +115,9 @@ public class GeneralConditionLayoutTests
 	}
 
 	[Test]
-	public void Negated_logical_groups_keep_explicit_parentheses()
+	[Arguments("||")]
+	[Arguments("&&")]
+	public void Negated_logical_groups_keep_explicit_parentheses(string operation)
 	{
 		const string expected = """
 			class C
@@ -130,7 +132,8 @@ public class GeneralConditionLayoutTests
 			    }
 			}
 			""";
-		AssertLayout(GeneralConditionLayoutSamples.Source("!(primaryReading.IsCalibrated || secondaryReading.IsCalibrated)"), expected);
+		AssertLayout(GeneralConditionLayoutSamples.Source($"!(primaryReading.IsCalibrated {operation} secondaryReading.IsCalibrated)"),
+			expected.Replace("||", operation, StringComparison.Ordinal));
 	}
 
 	[Test]
@@ -274,6 +277,8 @@ public class GeneralConditionLayoutTests
 	[Arguments("reading is { Payload: /* seam */ { Temperature: > 20 } }", "property-pattern boundary")]
 	[Arguments("reading.Kind is CalibrationKind.PrimaryReference /* seam */ or CalibrationKind.SecondaryReference", "pattern operators")]
 	[Arguments("!(primaryReading.IsCalibrated /* seam */ || secondaryReading.IsCalibrated)", "content trivia")]
+	[Arguments("!(primaryReading.IsCalibrated || /* seam */ secondaryReading.IsCalibrated)", "content trivia")]
+	[Arguments("reading is SensorFrame(/* seam */ primaryReading, secondaryReading)", "positional-pattern boundary")]
 	public void Pattern_and_logical_seam_content_refuses_without_output(string condition, string reason)
 	{
 		using var formatter = new CSharpFormatter();
@@ -537,6 +542,8 @@ public class GeneralConditionLayoutTests
 	[Arguments("reading is [1, .., 3]")]
 	[Arguments("Check($\"sensor-{index}\")")]
 	[Arguments("Check(@\"sensor\\reference\")")]
+	[Arguments("Check((primaryReading, secondaryReading))")]
+	[Arguments("firstReading + secondReading > requiredReading")]
 	public void Fitting_grammar_variants_stay_inline(string condition)
 	{
 		var expected = $$"""
@@ -678,5 +685,20 @@ public class GeneralConditionLayoutTests
 		selected.Success.Should().BeTrue(selected.Message);
 		selected.Text.Should().Be(ordinary.Text);
 		selected.LayoutApplications.Should().BeEmpty();
+	}
+
+	[Test]
+	[Arguments("for (; Check(primaryReading, secondaryReading, backupReading);) { Use(); }")]
+	[Arguments("do { Use(); } while (Check(primaryReading, secondaryReading, backupReading));")]
+	[Arguments("foreach (var reading in Read(primaryReading, secondaryReading, backupReading)) { Use(); }")]
+	[Arguments("using (var reading = Read(primaryReading, secondaryReading, backupReading)) { Use(); }")]
+	public void Unselected_statement_families_are_exact_default_fixed_points(string statement)
+	{
+		var source = "class C { void M() { " + statement + " } }";
+		var options = TestOptions.Parse(GeneralConditionLayoutSamples.Config);
+		using var formatter = new CSharpFormatter();
+		var ordinary = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true);
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		LayoutRuleAssertions.AssertLayout(source, ordinary.Text!.TrimEnd(), options, Rules(), expectApplications: false);
 	}
 }

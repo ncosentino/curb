@@ -213,7 +213,7 @@ moved across operators. Refusal leaves the source unchanged. Collection is bound
 ## Attached condition headers
 
 The `condition` matcher selects `if` and `else if` headers not claimed by a configured
-logical-condition or expression-callback recipe. Those specialized recipes retain their
+logical-condition or logical/expression-callback recipe. Those specialized recipes retain their
 existing selection and layout, independent of rule order. Without a `condition` rule,
 ordinary condition and pattern formatting stays unchanged.
 
@@ -243,6 +243,8 @@ It measures the first condition segment against the actual output prefix. Intern
 comparisons, ternaries and callbacks use their existing printers. Closing delimiters remain
 inside expression lookahead, so a header that exceeds the width by its final parenthesis
 wraps internally instead of overflowing.
+Call comparisons keep literal or identifier suffixes attached and let arguments supply
+the break instead of hanging the small comparison operand.
 
 ```csharp
 if (HasCalibration(

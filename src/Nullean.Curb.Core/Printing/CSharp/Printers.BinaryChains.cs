@@ -66,7 +66,8 @@ internal static partial class Printers
 		{
 			for (var i = 0; i < operators.Count; i++)
 			{
-				if (TokenPrinter.HasLeadingContent(operators[i]) || HasTrailingLambdaContent(operands[i].GetLastToken()))
+				if ((attachedLogicalLayout ? TokenPrinter.HasAnyContent(operators[i]) : TokenPrinter.HasLeadingContent(operators[i]))
+					|| HasTrailingLambdaContent(operands[i].GetLastToken()))
 					throw new LayoutRuleException(lambdaLayout
 						? "A logical lambda cannot move a break around content trivia."
 						: "A selected condition cannot move a break around content trivia.");

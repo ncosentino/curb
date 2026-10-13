@@ -136,6 +136,9 @@ internal static partial class Printers
 
 	private static void PrintAttachedPositionalPattern(PositionalPatternClauseSyntax node, PrintContext context)
 	{
+		if (HasAnyTrivia(node.OpenParenToken) || TokenPrinter.HasLeadingContent(node.CloseParenToken)
+			|| (node.Subpatterns.Count > 0 && HasTrailingLambdaContent(node.Subpatterns[^1].GetLastToken())))
+			throw new LayoutRuleException("A selected condition cannot move a positional-pattern boundary around content trivia.");
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
 		using (arena.Group())
