@@ -63,11 +63,16 @@ public class GeneralConditionLayoutTests
 	}
 
 	[Test]
-	public void Detached_pattern_types_do_not_double_indent_their_braces()
+	[Arguments(34, false)]
+	[Arguments(33, true)]
+	public void Detached_pattern_types_do_not_double_indent_their_braces(int width, bool detached)
 	{
 		var condition = GeneralConditionLayoutSamples.Property.Replace("reading is {", "reading is SensorFrame {", StringComparison.Ordinal);
-		var expected = GeneralConditionLayoutSamples.PropertyExpected.Replace("reading is\n", "reading is\n            SensorFrame\n", StringComparison.Ordinal);
-		AssertLayout(GeneralConditionLayoutSamples.Source(condition), expected, "max_line_length = 34");
+		var expected = GeneralConditionLayoutSamples.PropertyExpected.Replace("reading is\n",
+			detached ? "reading is\n            SensorFrame\n" : "reading is SensorFrame\n", StringComparison.Ordinal);
+		AssertLayout(GeneralConditionLayoutSamples.Source(condition), expected, $"max_line_length = {width}");
+		foreach (var line in expected.Split('\n'))
+			line.Length.Should().BeLessThanOrEqualTo(width);
 	}
 
 	[Test]
