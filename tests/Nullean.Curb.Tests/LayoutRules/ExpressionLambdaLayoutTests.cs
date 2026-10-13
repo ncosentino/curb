@@ -33,18 +33,8 @@ public class ExpressionLambdaLayoutTests
 
 	private static void AssertLayout(string source, string expected, string? settings = null, LayoutRuleSet? rules = null)
 	{
-		using var formatter = new CSharpFormatter();
 		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config + "\n" + settings);
-		rules ??= Rules();
-		var first = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
-		first.Success.Should().BeTrue(first.Message);
-		first.Text.Should().NotBeNull();
-		first.Text.TrimEnd('\r', '\n').Should().Be(expected);
-		first.LayoutApplications.Should().NotBeEmpty();
-		var second = formatter.Format(first.Text, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: rules);
-		second.Success.Should().BeTrue(second.Message);
-		second.Text.Should().Be(first.Text);
-		formatter.RoundTripsChecked.Should().Be(2);
+		LayoutRuleAssertions.AssertLayout(source, expected, options, rules ?? Rules());
 	}
 
 	[Test]

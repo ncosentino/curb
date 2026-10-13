@@ -19,7 +19,7 @@ on:
         type: string
         default: ''
       layout_tests_only:
-        description: Run only managed layout-rule tests; full and release validation override this
+        description: Run managed layout-rule and expression tests; full and release validation override this
         type: boolean
         default: false
 
@@ -55,10 +55,10 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: 10.0.303
-      - name: Run layout-rule tests
+      - name: Run layout-rule and expression tests
         shell: pwsh
         run: |
-          dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/Nullean.Curb.Tests.LayoutRules/*/*' --minimum-expected-tests 1
+          dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/(Nullean.Curb.Tests.LayoutRules)|(Nullean.Curb.Tests.Formatting.Expressions)/*/*' --minimum-expected-tests 278
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Exercise the managed CLI and compiler reference
         shell: pwsh
