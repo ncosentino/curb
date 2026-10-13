@@ -147,7 +147,14 @@ if (-not ($explanation -match 'rule = smoke-raw-strings;.*recipe = standalone-ra
 if (-not ($explanation -match 'rule = smoke-string-concatenation;.*recipe = argument-string-concatenation')) { throw 'The string-concatenation recipe was not explained.' }
 $explanation
 & $dotnet build $project --configuration Release
-if ($LASTEXITCODE -ne 0) { throw "The custom layout failed compiler/reference enforcement: $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) {
+    $buildExitCode = $LASTEXITCODE
+    & $dotnet format whitespace $project --no-restore
+    if ($LASTEXITCODE -ne 0) { throw 'The stock formatter could not diagnose the public fixture.' }
+    'Public condition fixture after stock formatting:'
+    [IO.File]::ReadAllText($conditionSource)
+    throw "The custom layout failed compiler/reference enforcement: $buildExitCode"
+}
 & $dotnet format whitespace $project --no-restore --verify-no-changes
 if ($LASTEXITCODE -ne 0) { throw "The custom layout was not a reference fixed point: $LASTEXITCODE" }
 
