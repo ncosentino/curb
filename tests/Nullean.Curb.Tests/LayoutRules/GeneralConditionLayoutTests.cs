@@ -234,6 +234,22 @@ public class GeneralConditionLayoutTests
 	}
 
 	[Test]
+	[Arguments("< 0", 29, false)]
+	[Arguments("< 0", 28, true)]
+	[Arguments("== expected", 37, false)]
+	[Arguments("== expected", 36, true)]
+	public void Call_comparisons_measure_the_complete_suffix_before_wrapping(string suffix, int width, bool broken)
+	{
+		var header = broken
+			? $"if (Check(\n            value\n        ) {suffix})"
+			: $"if (Check(value) {suffix})";
+		var expected = GeneralConditionLayoutSamples.CallExpected.Replace(
+			"if (HasCalibration(\n            primaryReading,\n            secondaryReading,\n            backupReading\n        ))",
+			header, StringComparison.Ordinal);
+		AssertLayout(GeneralConditionLayoutSamples.Source("Check(value) " + suffix), expected, $"max_line_length = {width}");
+	}
+
+	[Test]
 	public void Long_type_and_designation_use_the_is_pattern_gap()
 	{
 		const string expected = """
