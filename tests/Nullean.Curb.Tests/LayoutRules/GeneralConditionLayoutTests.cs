@@ -67,8 +67,8 @@ public class GeneralConditionLayoutTests
 	[Arguments(33, true)]
 	public void Detached_pattern_types_do_not_double_indent_their_braces(int width, bool detached)
 	{
-		var condition = GeneralConditionLayoutSamples.Property.Replace("reading is {", "reading is SensorFrame {", StringComparison.Ordinal);
-		var expected = GeneralConditionLayoutSamples.PropertyExpected.Replace("reading is\n",
+		const string condition = "reading is SensorFrame { Heat: > 20, Humidity: < 80 } accepted";
+		var expected = GeneralConditionLayoutSamples.PropertyExpected.Replace("Temperature", "Heat", StringComparison.Ordinal).Replace("reading is\n",
 			detached ? "reading is\n            SensorFrame\n" : "reading is SensorFrame\n", StringComparison.Ordinal);
 		AssertLayout(GeneralConditionLayoutSamples.Source(condition), expected, $"max_line_length = {width}");
 		foreach (var line in expected.Split('\n'))

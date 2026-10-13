@@ -21,6 +21,18 @@ function Copy-Corpus([string]$source, [string]$destination) {
     }
 }
 
+function Assert-DefaultBaseline([string]$candidate, [string]$baseline, [string]$mode) {
+    $files = @(Get-ChildItem -LiteralPath $candidate -Recurse -File -Filter '*.cs')
+    if ($files.Count -lt 100) { throw 'The corpus contains too few C# files.' }
+    foreach ($file in $files) {
+        $relative = [IO.Path]::GetRelativePath($candidate, $file.FullName)
+        if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $baseline $relative)).Hash) {
+            throw "The default layout changed against the base commit in ${mode}: $relative"
+        }
+    }
+    "Disabled policy matches the base commit in ${mode}: $($files.Count) files."
+}
+
 $disabled = Join-Path $TestDirectory 'disabled'
 $baseline = Join-Path $TestDirectory 'baseline'
 $selected = Join-Path $TestDirectory 'selected'
@@ -34,17 +46,22 @@ Copy-Corpus $disabled $baseline
 if ($LASTEXITCODE -ne 0) { throw 'The default baseline did not format the corpus safely.' }
 & $Binary format $disabled --layout-rules none
 if ($LASTEXITCODE -ne 0) { throw 'The disabled policy did not format the corpus safely.' }
-$files = @(Get-ChildItem -LiteralPath $disabled -Recurse -File -Filter '*.cs')
-if ($files.Count -lt 100) { throw 'The corpus contains too few C# files.' }
-foreach ($file in $files) {
-    $relative = [IO.Path]::GetRelativePath($disabled, $file.FullName)
-    if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $baseline $relative)).Hash) {
-        throw "The default layout changed against the base commit: $relative"
-    }
+Assert-DefaultBaseline $disabled $baseline 'deterministic width 120'
+$preserved = Join-Path $TestDirectory 'preserved'
+$preservedBaseline = Join-Path $TestDirectory 'preserved-baseline'
+Copy-Corpus $Corpus $preserved
+foreach ($configuration in Get-ChildItem -LiteralPath $preserved -Recurse -Force -File -Filter '.editorconfig') {
+    [IO.File]::AppendAllText($configuration.FullName, "`n[*.cs]`nmax_line_length = off`ncsharp_keep_existing_linebreaks = true`n")
 }
-"Disabled policy matches the base commit: $($files.Count) files."
+Copy-Corpus $preserved $preservedBaseline
+& $dotnet $BaselineCli format $preservedBaseline --layout-rules none
+if ($LASTEXITCODE -ne 0) { throw 'The preservation baseline did not format the corpus safely.' }
+& $Binary format $preserved --layout-rules none
+if ($LASTEXITCODE -ne 0) { throw 'The disabled preservation policy did not format the corpus safely.' }
+Assert-DefaultBaseline $preserved $preservedBaseline 'preservation without width'
 
 Copy-Corpus $disabled $selected
+$files = @(Get-ChildItem -LiteralPath $disabled -Recurse -File -Filter '*.cs')
 $policy = Join-Path $selected '.condition-layout.json'
 [IO.File]::WriteAllText($policy, @'
 {
