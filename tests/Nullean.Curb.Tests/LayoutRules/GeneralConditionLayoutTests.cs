@@ -208,6 +208,154 @@ public class GeneralConditionLayoutTests
 	}
 
 	[Test]
+	[Arguments(true, 27, false)]
+	[Arguments(true, 26, true)]
+	[Arguments(false, 24, false)]
+	[Arguments(false, 23, true)]
+	public void Complete_width_honors_control_flow_spacing(bool inside, int width, bool broken)
+	{
+		var header = broken
+			? (inside ? "if ( Check(\n            value\n        ) )" : "if(Check(\n            value\n        ))")
+			: (inside ? "if ( Check(value) )" : "if(Check(value))");
+		var expected = GeneralConditionLayoutSamples.CallExpected.Replace(
+			"if (HasCalibration(\n            primaryReading,\n            secondaryReading,\n            backupReading\n        ))",
+			header, StringComparison.Ordinal);
+		AssertLayout(GeneralConditionLayoutSamples.Source("Check(value)"), expected,
+			$"max_line_length = {width}\ncsharp_space_between_parentheses = {(inside ? "control_flow_statements" : "false")}\ncsharp_space_after_keywords_in_control_flow_statements = {(inside ? "true" : "false")}");
+	}
+
+	[Test]
+	public void Forced_argument_chopping_still_owns_call_layout()
+	{
+		var expected = GeneralConditionLayoutSamples.CallExpected.Replace(
+			"HasCalibration(\n            primaryReading,\n            secondaryReading,\n            backupReading",
+			"Check(\n            value", StringComparison.Ordinal);
+		AssertLayout(GeneralConditionLayoutSamples.Source("Check(value)"), expected, "csharp_wrap_arguments_style = chop_always");
+	}
+
+	[Test]
+	public void Long_type_and_designation_use_the_is_pattern_gap()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (reading is
+			            SensorFrame calibrationRecord)
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source("reading is SensorFrame calibrationRecord"), expected);
+	}
+
+	[Test]
+	[Arguments("reading is /* seam */ SensorFrame frame", "is-pattern boundary")]
+	[Arguments("reading /* seam */ is SensorFrame frame", "is-pattern boundary")]
+	[Arguments("reading is { Payload: /* seam */ { Temperature: > 20 } }", "property-pattern boundary")]
+	[Arguments("reading.Kind is CalibrationKind.PrimaryReference /* seam */ or CalibrationKind.SecondaryReference", "pattern operators")]
+	[Arguments("!(primaryReading.IsCalibrated /* seam */ || secondaryReading.IsCalibrated)", "content trivia")]
+	public void Pattern_and_logical_seam_content_refuses_without_output(string condition, string reason)
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(GeneralConditionLayoutSamples.Source(condition),
+			TestOptions.Parse(GeneralConditionLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain(reason);
+	}
+
+	[Test]
+	public void Directives_inside_selected_headers_refuse_without_output()
+	{
+		const string source = """
+			class C { void M() { if (Check(
+			#if DEBUG
+			    primaryReading
+			#else
+			    secondaryReading
+			#endif
+			)) { Use(); } } }
+			""";
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(source, TestOptions.Parse(GeneralConditionLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Message.Should().Contain("condition-boundary trivia");
+	}
+
+	[Test]
+	public void Pattern_chain_budget_refuses_instead_of_partially_printing()
+	{
+		var condition = "reading.Kind is " + string.Join(" or ", Enumerable.Repeat("CalibrationKind.PrimaryReference", 257));
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(GeneralConditionLayoutSamples.Source(condition),
+			TestOptions.Parse(GeneralConditionLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Message.Should().Contain("511-node budget");
+	}
+
+	[Test]
+	public void Reused_formatter_does_not_leak_condition_policy_between_files()
+	{
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(GeneralConditionLayoutSamples.Config);
+		var source = GeneralConditionLayoutSamples.Source(GeneralConditionLayoutSamples.Property);
+		var selected = formatter.Format(source, options, layoutRules: Rules());
+		selected.Success.Should().BeTrue(selected.Message);
+		var ordinary = formatter.Format(source, options);
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		ordinary.Text!.TrimEnd().Should().Be(GeneralConditionLayoutSamples.PropertyDefault);
+		ordinary.LayoutApplications.Should().BeEmpty();
+	}
+
+	[Test]
+	public void Indivisible_prefixes_retain_the_outer_header_fallback()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (
+			            HasCalibrationForEveryConfiguredReferenceReading()
+			        )
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source("HasCalibrationForEveryConfiguredReferenceReading()"), expected);
+	}
+
+	[Test]
+	public void Argument_patterns_do_not_inherit_the_header_pattern_policy()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (Check(
+			            reading.Kind is CalibrationKind.PrimaryReference or CalibrationKind.SecondaryReference
+			        ))
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source(
+			"Check(reading.Kind is CalibrationKind.PrimaryReference or CalibrationKind.SecondaryReference)"), expected);
+	}
+
+	[Test]
 	public void Named_ref_in_and_out_arguments_use_the_normal_argument_printer()
 	{
 		const string expected = """
@@ -480,6 +628,22 @@ public class GeneralConditionLayoutTests
 			layoutRules: new LayoutRuleSet([new ExpressionLambdaLayoutRule("callback")]));
 		var combined = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource, options,
 			layoutRules: new LayoutRuleSet([new ConditionLayoutRule("general"), new ExpressionLambdaLayoutRule("callback")]));
+		specialized.Success.Should().BeTrue(specialized.Message);
+		combined.Success.Should().BeTrue(combined.Message);
+		combined.Text.Should().Be(specialized.Text);
+		combined.LayoutApplications.Should().ContainSingle().Which.RuleId.Should().Be("callback");
+	}
+
+	[Test]
+	public void Existing_logical_callback_ownership_does_not_change()
+	{
+		var options = TestOptions.Parse(LogicalLambdaLayoutSamples.Config);
+		var source = GeneralConditionLayoutSamples.Source("Readings.Any(reading => reading.IsCalibrated && reading.HasReferenceValue)");
+		using var formatter = new CSharpFormatter();
+		var specialized = formatter.Format(source, options,
+			layoutRules: new LayoutRuleSet([new LogicalLambdaLayoutRule("callback")]));
+		var combined = formatter.Format(source, options,
+			layoutRules: new LayoutRuleSet([new ConditionLayoutRule("general"), new LogicalLambdaLayoutRule("callback")]));
 		specialized.Success.Should().BeTrue(specialized.Message);
 		combined.Success.Should().BeTrue(combined.Message);
 		combined.Text.Should().Be(specialized.Text);

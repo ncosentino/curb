@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
+using Nullean.Curb.LayoutRules;
 
 namespace Nullean.Curb.Printing.CSharp;
 
@@ -9,6 +10,11 @@ internal static partial class Printers
 {
 	public static void IsPatternExpression(IsPatternExpressionSyntax node, PrintContext context)
 	{
+		if (context.IsInAttachedCondition(node)
+			&& (TokenPrinter.HasAnyContent(node.IsKeyword)
+				|| HasTrailingLambdaContent(node.Expression.GetLastToken())
+				|| TokenPrinter.HasLeadingContent(node.Pattern.GetFirstToken())))
+			throw new LayoutRuleException("A selected condition cannot move an is-pattern boundary around content trivia.");
 		Node.Print(node.Expression, context);
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
@@ -152,6 +158,11 @@ internal static partial class Printers
 	{
 		if (node.ExpressionColon is not null)
 		{
+			if (context.IsInAttachedCondition(node)
+				&& BareRecursivePatternOwnsLeadingBrace(node.Pattern, context)
+				&& (TokenPrinter.HasAnyContent(node.ExpressionColon.ColonToken)
+					|| TokenPrinter.HasLeadingContent(node.Pattern.GetFirstToken())))
+				throw new LayoutRuleException("A selected condition cannot move a property-pattern boundary around content trivia.");
 			Node.Print(node.ExpressionColon.Expression, context);
 			TokenPrinter.Print(node.ExpressionColon.ColonToken, context);
 			if (!BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
