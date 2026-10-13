@@ -54,7 +54,8 @@ internal static partial class Printers
 		SyntaxNode? right,
 		PrintContext context,
 		int operatorEnd = -1,
-		bool suppressIndent = false)
+		bool suppressIndent = false,
+		bool preferInternalBreaks = false)
 	{
 		var arena = context.Arena;
 
@@ -69,7 +70,8 @@ internal static partial class Printers
 		// at that new, shallower indent, so the RHS's own chain or argument list never broke either:
 		// the assignment ate the only break the line needed.
 		if (right is ExpressionSyntax expression
-			&& (BringsOwnBlock(expression)
+			&& ((preferInternalBreaks && expression is LiteralExpressionSyntax or IdentifierNameSyntax)
+				|| BringsOwnBlock(expression)
 				|| (operatorEnd >= 0 && context.AuthorJoined(operatorEnd, expression.SpanStart))
 				|| (!context.Options.KeepExistingLinebreaks && BreaksWithoutHelp(expression))))
 		{
@@ -148,7 +150,8 @@ internal static partial class Printers
 			return;
 		}
 
-		OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented || concatenationRule is not null);
+		OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented || concatenationRule is not null,
+			preferInternalBreaks: context.IsInAttachedCondition(node) && node.Left is InvocationExpressionSyntax);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)

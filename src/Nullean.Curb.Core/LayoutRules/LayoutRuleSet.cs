@@ -19,6 +19,7 @@ public sealed class LayoutRuleSet
 		var ids = new HashSet<string>(StringComparer.Ordinal);
 		var index = new Dictionary<string, List<WrapperLayoutRule>>(StringComparer.Ordinal);
 		var conditions = new List<LogicalConditionLayoutRule>();
+		var generalConditions = new List<ConditionLayoutRule>();
 		var logicalLambdas = new List<LogicalLambdaLayoutRule>();
 		var expressionLambdas = new List<ExpressionLambdaLayoutRule>();
 		var rawStrings = new List<MultilineRawStringLayoutRule>();
@@ -28,6 +29,11 @@ public sealed class LayoutRuleSet
 			ArgumentNullException.ThrowIfNull(rule);
 			if (!ids.Add(rule.Id))
 				throw new ArgumentException("Layout rule IDs must be unique.", nameof(rules));
+			if (rule is ConditionLayoutRule generalCondition)
+			{
+				generalConditions.Add(generalCondition);
+				continue;
+			}
 			if (rule is LogicalLambdaLayoutRule logicalLambda)
 			{
 				logicalLambdas.Add(logicalLambda);
@@ -65,6 +71,7 @@ public sealed class LayoutRuleSet
 		_byCallee = index.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.Ordinal);
 		Rules = Array.AsReadOnly(entries);
 		Conditions = conditions.AsReadOnly();
+		GeneralConditions = generalConditions.AsReadOnly();
 		LogicalLambdas = logicalLambdas.AsReadOnly();
 		ExpressionLambdas = expressionLambdas.AsReadOnly();
 		RawStrings = rawStrings.AsReadOnly();
@@ -75,6 +82,8 @@ public sealed class LayoutRuleSet
 	public IReadOnlyList<LayoutRule> Rules { get; }
 
 	internal IReadOnlyList<LogicalConditionLayoutRule> Conditions { get; }
+
+	internal IReadOnlyList<ConditionLayoutRule> GeneralConditions { get; }
 
 	internal IReadOnlyList<LogicalLambdaLayoutRule> LogicalLambdas { get; }
 

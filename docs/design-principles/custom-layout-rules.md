@@ -5,7 +5,7 @@ description: Repository-owned syntax rules for specialized layouts without sourc
 
 # Repository-owned layout rules
 
-Version 1 supports wrapper chains, logical condition headers, logical and nonlogical
+Version 1 supports wrapper chains, logical and general condition headers, logical and nonlogical
 expression-lambda arguments, multiline raw strings and string-concatenation arguments
 as separate typed recipes.
 Rules are repository data, not executable plugins or source annotations.
@@ -209,6 +209,80 @@ printer. Content trivia on delimiter seams, comments that prevent moving an oper
 trailing position, and directives in a selected condition are currently refused rather than
 moved across operators. Refusal leaves the source unchanged. Collection is bounded to
 511 syntax nodes per chain.
+
+## Attached condition headers
+
+The `condition` matcher selects `if` and `else if` headers not claimed by a configured
+logical-condition or logical/expression-callback recipe. Those specialized recipes retain their
+existing selection and layout, independent of rule order. Without a `condition` rule,
+ordinary condition and pattern formatting stays unchanged.
+
+```json
+{
+  "schemaVersion": 1,
+  "rules": [{
+    "id": "condition-headers",
+    "files": ["**/*.cs"],
+    "match": {
+      "kind": "condition",
+      "owner": "if-statement"
+    },
+    "layout": {
+      "recipe": "attached-condition",
+      "wrap": "if-long",
+      "header": "inline-if-fits",
+      "continuation": "one-indent",
+      "closeParen": "with-condition"
+    }
+  }]
+}
+```
+
+The recipe requires a finite width, deterministic layout and non-ignored binary spacing.
+It measures the first condition segment against the actual output prefix. Internal calls,
+comparisons, ternaries and callbacks use their existing printers. Closing delimiters remain
+inside expression lookahead, so a header that exceeds the width by its final parenthesis
+wraps internally instead of overflowing.
+Call comparisons keep literal or identifier suffixes attached and let arguments supply
+the break instead of hanging the small comparison operand.
+
+```csharp
+if (HasCalibration(
+    primaryReading,
+    secondaryReading,
+    backupReading
+))
+{
+    Use();
+}
+```
+
+Within selected headers, property patterns own their brace gaps, including nested property
+patterns. Pattern `and`/`or` chains and positional patterns gain width-driven internal breaks.
+Logical expression chains behind negation or parentheses use trailing operators.
+Pattern and expression grouping, designations, argument values and token order are preserved.
+
+```csharp
+if (reading is
+    {
+        Temperature: > 20,
+        Humidity: < 80
+    } accepted)
+{
+    Use(accepted);
+}
+```
+
+When the first segment cannot fit, the outer opening and closing seams may still break.
+Indivisible tokens can exceed the width. The recipe does not promise that every header stays
+attached or every token fits. `while`, `do`, `for`, `foreach`, `using`, `lock`, and patterns
+outside selected condition headers retain ordinary behavior. Nested callback statements
+do not inherit an enclosing header's pattern policy.
+
+Suppression takes precedence. Duplicate general claims, directives in selected conditions
+and unsupported content trivia on moved boundaries fail explicitly without writing output.
+Pattern chains are bounded to 511 syntax nodes. The common file-filtering, cache, CLI,
+EditorConfig and MSBuild rule-pack contracts apply without a new EditorConfig key.
 
 ## Logical lambda arguments
 

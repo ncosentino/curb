@@ -19,7 +19,7 @@ on:
         type: string
         default: ''
       layout_tests_only:
-        description: Run only managed layout-rule tests; full and release validation override this
+        description: Run managed layout-rule and expression tests; full and release validation override this
         type: boolean
         default: false
 
@@ -55,10 +55,10 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: 10.0.303
-      - name: Run layout-rule tests
+      - name: Run layout-rule and expression tests
         shell: pwsh
         run: |
-          dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/Nullean.Curb.Tests.LayoutRules/*/*' --minimum-expected-tests 1
+          dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/(Nullean.Curb.Tests.LayoutRules)|(Nullean.Curb.Tests.Formatting.Expressions)/*/*' --minimum-expected-tests 278
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Exercise the managed CLI and compiler reference
         shell: pwsh
@@ -188,6 +188,46 @@ jobs:
           $extension = if ($IsWindows) { '.exe' } else { '' }
           $binary = Join-Path $PWD ".artifacts/publish/Nullean.Curb.Cli/release_$($env:RID)/curb$extension"
           ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $binary -TestDirectory (Join-Path $env:RUNNER_TEMP 'native-layout-rules')
+      - name: Exercise the condition rule through the MSBuild package
+        if: matrix.rid == 'linux-x64' && !inputs.full && !inputs.publish_release
+        shell: pwsh
+        run: |
+          $feed = Join-Path $env:RUNNER_TEMP 'condition-package-feed'
+          dotnet pack src/Nullean.Curb.MSBuild -c Release -o $feed
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packages = @(Get-ChildItem -LiteralPath $feed -File -Filter 'ncosentino.curb.*.nupkg')
+          if ($packages.Count -ne 1) { throw 'Expected exactly one MSBuild package.' }
+          $version = $packages[0].BaseName.Substring('ncosentino.curb.'.Length)
+          $config = Join-Path $feed 'NuGet.Config'
+          $escaped = [Security.SecurityElement]::Escape($feed)
+          [IO.File]::WriteAllText($config, "<configuration><packageSources><clear/><add key='local' value='$escaped'/></packageSources></configuration>")
+          $binary = Join-Path $PWD '.artifacts' 'publish' 'Nullean.Curb.Cli' 'release_linux-x64' 'curb'
+          ./build/distribution/Test-LayoutRuleInstallation.ps1 -Binary $binary -TestDirectory (Join-Path $env:RUNNER_TEMP 'condition-package-consumer') -PackageVersion $version -NuGetConfig $config
+      - name: Compare default and selected conditions on the public corpus
+        if: matrix.rid == 'linux-x64'
+        shell: pwsh
+        run: |
+          $corpus = Join-Path $env:RUNNER_TEMP 'condition-corpus'
+          git init $corpus
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $corpus remote add origin https://github.com/elastic/docs-builder.git
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $corpus fetch --depth 1 origin $env:CORPUS_COMMIT
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $corpus checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $base = git merge-base origin/main HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $baseline = Join-Path $env:RUNNER_TEMP 'condition-baseline'
+          git worktree add --detach $baseline $base
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build (Join-Path $baseline 'src' 'Nullean.Curb.Cli') -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $baselineCli = Join-Path $baseline '.artifacts' 'bin' 'Nullean.Curb.Cli' 'release' 'curb.dll'
+          $binary = Join-Path $PWD '.artifacts' 'publish' 'Nullean.Curb.Cli' 'release_linux-x64' 'curb'
+          ./build/distribution/Test-ConditionLayoutCorpus.ps1 -Binary $binary -BaselineCli $baselineCli -Corpus $corpus -TestDirectory (Join-Path $env:RUNNER_TEMP 'condition-corpus-proof')
+          git worktree remove $baseline
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   packages:
     if: github.repository == 'ncosentino/curb' && (inputs.full || inputs.publish_release)
