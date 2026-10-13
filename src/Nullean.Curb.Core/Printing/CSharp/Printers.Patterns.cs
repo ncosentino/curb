@@ -22,6 +22,11 @@ internal static partial class Printers
 			Node.Print(node.Pattern, context);
 			return;
 		}
+		if (context.IsInAttachedCondition(node))
+		{
+			PrintAttachedPatternGap(node.Pattern, context);
+			return;
+		}
 
 		// A break the author put after `is` is theirs, the same as one between two alternatives of the
 		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
@@ -67,16 +72,21 @@ internal static partial class Printers
 		if (node.PositionalPatternClause is not null)
 		{
 			var positional = node.PositionalPatternClause;
-			TokenPrinter.Print(positional.OpenParenToken, context);
-			for (var i = 0; i < positional.Subpatterns.Count; i++)
+			if (context.IsInAttachedCondition(node))
+				PrintAttachedPositionalPattern(positional, context);
+			else
 			{
-				Node.Print(positional.Subpatterns[i], context);
-				if (i >= positional.Subpatterns.SeparatorCount)
-					continue;
-				TokenPrinter.Print(positional.Subpatterns.GetSeparator(i), context);
-				arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(positional.OpenParenToken, context);
+				for (var i = 0; i < positional.Subpatterns.Count; i++)
+				{
+					Node.Print(positional.Subpatterns[i], context);
+					if (i >= positional.Subpatterns.SeparatorCount)
+						continue;
+					TokenPrinter.Print(positional.Subpatterns.GetSeparator(i), context);
+					arena.Synthetic(SyntheticText.Space);
+				}
+				TokenPrinter.Print(positional.CloseParenToken, context);
 			}
-			TokenPrinter.Print(positional.CloseParenToken, context);
 		}
 
 		if (node.PropertyPatternClause is not null)
@@ -147,6 +157,11 @@ internal static partial class Printers
 	/// <summary>Covers <c>and</c>, <c>or</c> and relational patterns, all of which need spacing.</summary>
 	public static void BinaryPattern(BinaryPatternSyntax node, PrintContext context)
 	{
+		if (context.IsInAttachedCondition(node))
+		{
+			PrintAttachedPatternChain(node, context);
+			return;
+		}
 		Node.Print(node.Left, context);
 
 		// The same rule BinaryExpression follows: a chain the author broke stays broken, on whichever

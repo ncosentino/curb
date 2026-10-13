@@ -32,6 +32,22 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 
 	public SyntaxNode? LogicalLambdaRoot { get; set; }
 
+	public SyntaxNode? AttachedConditionRoot { get; set; }
+
+	public bool IsInAttachedCondition(SyntaxNode node) => IsWithinLayoutRoot(node, AttachedConditionRoot, stopAtArguments: true);
+
+	public bool IntersectsSuppression(TextSpan owner)
+	{
+		if (Suppressed is not { } suppressed)
+			return false;
+		foreach (var span in suppressed)
+		{
+			if (span.IntersectsWith(owner))
+				return true;
+		}
+		return false;
+	}
+
 	public bool IsInLogicalLambdaBody(SyntaxNode node) => IsWithinLayoutRoot(node, LogicalLambdaRoot, stopAtArguments: true);
 
 	public bool IsInLogicalConditionHeader(SyntaxNode node) => IsWithinLayoutRoot(node, LogicalConditionRoot);

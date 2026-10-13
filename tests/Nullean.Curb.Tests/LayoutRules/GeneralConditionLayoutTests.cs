@@ -284,7 +284,7 @@ public class GeneralConditionLayoutTests
 	}
 
 	[Test]
-	public void List_patterns_and_positional_patterns_keep_their_tokens()
+	public void Positional_patterns_delegate_internal_subpattern_wrapping()
 	{
 		const string expected = """
 			class C
