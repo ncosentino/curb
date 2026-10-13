@@ -184,4 +184,319 @@ public class GeneralConditionLayoutTests
 		selected.Text.Should().Be(ordinary.Text);
 		selected.LayoutApplications.Should().BeEmpty();
 	}
+
+	[Test]
+	[Arguments(26, false)]
+	[Arguments(25, false)]
+	[Arguments(24, true)]
+	public void Complete_header_width_includes_both_closing_delimiters(int width, bool broken)
+	{
+		var header = broken ? "if (Check(\n            value\n        ))" : "if (Check(value))";
+		var expected = $$"""
+			class C
+			{
+			    void M()
+			    {
+			        {{header}}
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source("Check(value)"), expected, $"max_line_length = {width}");
+	}
+
+	[Test]
+	public void Named_ref_in_and_out_arguments_use_the_normal_argument_printer()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (Check(
+			            primary: primaryReading,
+			            ref secondaryReading,
+			            in backupReading,
+			            out SensorFrame? selectedReading
+			        ))
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source(
+			"Check(primary: primaryReading, ref secondaryReading, in backupReading, out SensorFrame? selectedReading)"), expected);
+	}
+
+	[Test]
+	public void Generic_calls_and_postfixes_keep_their_original_ownership()
+	{
+		var source = GeneralConditionLayoutSamples.Source("Check<SensorFrame>(primaryReading, secondaryReading, backupReading).ConfigureAwait(false)");
+		var expected = GeneralConditionLayoutSamples.CallExpected.Replace("HasCalibration(", "Check<SensorFrame>(", StringComparison.Ordinal)
+			.Replace("        ))", "        ).ConfigureAwait(false))", StringComparison.Ordinal);
+		AssertLayout(source, expected);
+	}
+
+	[Test]
+	public void Pattern_negation_parentheses_and_alternatives_preserve_grouping()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (reading.Kind is not (CalibrationKind.PrimaryReference or
+			            CalibrationKind.SecondaryReference))
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source(
+			"reading.Kind is not (CalibrationKind.PrimaryReference or CalibrationKind.SecondaryReference)"),
+			expected, "max_line_length = 70");
+	}
+
+	[Test]
+	public void Pattern_conjunctions_use_the_same_internal_break_policy()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (reading is not PrimarySensorFrame and
+			            not SecondarySensorFrame and
+			            not ReferenceSensorFrame)
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source(
+			"reading is not PrimarySensorFrame and not SecondarySensorFrame and not ReferenceSensorFrame"),
+			expected, "max_line_length = 60");
+	}
+
+	[Test]
+	public void List_patterns_and_positional_patterns_keep_their_tokens()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (reading is SensorFrame(
+			            primaryReading,
+			            secondaryReading
+			        ))
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source("reading is SensorFrame(primaryReading, secondaryReading)"), expected);
+	}
+
+	[Test]
+	public void Nested_property_patterns_delegate_their_own_brace_indentation()
+	{
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (reading is
+			        {
+			            Payload:
+			            {
+			                Temperature: > 20,
+			                Humidity: < 80
+			            }
+			        } accepted)
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source(
+			"reading is { Payload: { Temperature: > 20, Humidity: < 80 } } accepted"), expected);
+	}
+
+	[Test]
+	public void Block_callbacks_can_contain_independently_selected_headers()
+	{
+		const string source = "class C { void M() { if (Readings.Any(reading => { if (HasCalibration(primaryReading, secondaryReading, backupReading)) { return true; } return false; })) { Use(); } } }";
+		const string expected = """
+			class C
+			{
+			    void M()
+			    {
+			        if (Readings.Any(reading =>
+			        {
+			            if (HasCalibration(
+			                primaryReading,
+			                secondaryReading,
+			                backupReading
+			            ))
+			            {
+			                return true;
+			            }
+			            return false;
+			        }))
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(source, expected);
+	}
+
+	[Test]
+	[Arguments("true")]
+	[Arguments("ready")]
+	[Arguments("reading.IsCalibrated")]
+	[Arguments("flags[index]")]
+	[Arguments("(bool)reading")]
+	[Arguments("checked(count > 0)")]
+	[Arguments("unchecked(count > 0)")]
+	[Arguments("(ready = Check(value))")]
+	[Arguments("reading?.IsCalibrated ?? false")]
+	[Arguments("reading is [1, .., 3]")]
+	[Arguments("Check($\"sensor-{index}\")")]
+	[Arguments("Check(@\"sensor\\reference\")")]
+	public void Fitting_grammar_variants_stay_inline(string condition)
+	{
+		var expected = $$"""
+			class C
+			{
+			    void M()
+			    {
+			        if ({{condition}})
+			        {
+			            Use();
+			        }
+			    }
+			}
+			""";
+		AssertLayout(GeneralConditionLayoutSamples.Source(condition), expected, "max_line_length = 100");
+	}
+
+	[Test]
+	[Arguments("max_line_length = off")]
+	[Arguments("csharp_keep_existing_linebreaks = true")]
+	[Arguments("csharp_space_around_binary_operators = ignore")]
+	public void Inapplicable_modes_refuse_without_output(string setting)
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(GeneralConditionLayoutSamples.Source(GeneralConditionLayoutSamples.Call),
+			TestOptions.Parse(GeneralConditionLayoutSamples.Config + "\n" + setting), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+	}
+
+	[Test]
+	[Arguments("if (", "if /* seam */ (")]
+	[Arguments("if (", "if (/* seam */ ")]
+	[Arguments("backupReading))", "backupReading) /* seam */ )")]
+	[Arguments("backupReading))", "backupReading) // seam\n)")]
+	public void Moved_boundary_content_fails_without_output(string before, string after)
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(GeneralConditionLayoutSamples.Source(GeneralConditionLayoutSamples.Call).Replace(before, after, StringComparison.Ordinal),
+			TestOptions.Parse(GeneralConditionLayoutSamples.Config), layoutRules: Rules());
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Changed.Should().BeFalse();
+		result.Message.Should().Contain("condition-boundary trivia");
+	}
+
+	[Test]
+	public void Duplicate_general_claims_fail_explicitly()
+	{
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(GeneralConditionLayoutSamples.Source(GeneralConditionLayoutSamples.Call),
+			TestOptions.Parse(GeneralConditionLayoutSamples.Config),
+			layoutRules: new LayoutRuleSet([new ConditionLayoutRule("first"), new ConditionLayoutRule("second")]));
+		result.Status.Should().Be(FormatStatus.VerificationFailed);
+		result.Text.Should().BeNull();
+		result.Message.Should().Contain("same condition header");
+	}
+
+	[Test]
+	public void Suppression_wins_over_general_condition_selection()
+	{
+		const string source = """
+			class C
+			{
+			    void M()
+			    {
+			#pragma warning disable IDE0055
+			        if (HasCalibration(primaryReading, secondaryReading, backupReading)) { Use(); }
+			#pragma warning restore IDE0055
+			    }
+			}
+			""";
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(GeneralConditionLayoutSamples.Config);
+		var ordinary = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true);
+		var selected = formatter.Format(source, options, verifyRoundTrip: true, forceRoundTrip: true, layoutRules: Rules());
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		selected.Success.Should().BeTrue(selected.Message);
+		selected.Text.Should().Be(ordinary.Text);
+		selected.LayoutApplications.Should().BeEmpty();
+	}
+
+	[Test]
+	public void Existing_logical_condition_ownership_does_not_change()
+	{
+		var options = TestOptions.Parse(ConditionLayoutSamples.Config);
+		using var formatter = new CSharpFormatter();
+		var specialized = formatter.Format(ConditionLayoutSamples.Source, options,
+			layoutRules: new LayoutRuleSet([new LogicalConditionLayoutRule("logical")]));
+		var combined = formatter.Format(ConditionLayoutSamples.Source, options,
+			layoutRules: new LayoutRuleSet([new ConditionLayoutRule("general"), new LogicalConditionLayoutRule("logical")]));
+		specialized.Success.Should().BeTrue(specialized.Message);
+		combined.Success.Should().BeTrue(combined.Message);
+		combined.Text.Should().Be(specialized.Text);
+		combined.LayoutApplications.Should().ContainSingle().Which.RuleId.Should().Be("logical");
+	}
+
+	[Test]
+	public void Existing_callback_ownership_does_not_change()
+	{
+		var options = TestOptions.Parse(ExpressionLambdaLayoutSamples.Config);
+		using var formatter = new CSharpFormatter();
+		var specialized = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource, options,
+			layoutRules: new LayoutRuleSet([new ExpressionLambdaLayoutRule("callback")]));
+		var combined = formatter.Format(ExpressionLambdaLayoutSamples.PatternSource, options,
+			layoutRules: new LayoutRuleSet([new ConditionLayoutRule("general"), new ExpressionLambdaLayoutRule("callback")]));
+		specialized.Success.Should().BeTrue(specialized.Message);
+		combined.Success.Should().BeTrue(combined.Message);
+		combined.Text.Should().Be(specialized.Text);
+		combined.LayoutApplications.Should().ContainSingle().Which.RuleId.Should().Be("callback");
+	}
+
+	[Test]
+	public void Unselected_patterns_outside_if_headers_do_not_change()
+	{
+		const string source = "class C { bool M(object reading) { return reading is { Temperature: > 20, Humidity: < 80 } accepted; } }";
+		using var formatter = new CSharpFormatter();
+		var options = TestOptions.Parse(GeneralConditionLayoutSamples.Config);
+		var ordinary = formatter.Format(source, options);
+		var selected = formatter.Format(source, options, layoutRules: Rules());
+		ordinary.Success.Should().BeTrue(ordinary.Message);
+		selected.Success.Should().BeTrue(selected.Message);
+		selected.Text.Should().Be(ordinary.Text);
+		selected.LayoutApplications.Should().BeEmpty();
+	}
 }
