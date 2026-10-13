@@ -40,20 +40,26 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
-	/// pattern directly under an <c>is</c> expression, with nothing between the `is` keyword and the
-	/// pattern in the source. Author-broken input keeps the caller's forced line instead, matching every
-	/// other pattern shape.
+	/// Property-only patterns own their leading brace-line under <c>is</c>, and under a selected
+	/// property's colon. Preserved author breaks remain with the caller.
 	/// </summary>
 	private static bool BareRecursivePatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
-		pattern is RecursivePatternSyntax
+		(pattern is RecursivePatternSyntax
 		{
 			Type: null,
 			PositionalPatternClause: null,
 			PropertyPatternClause.Subpatterns.Count: > 0,
 			Parent: IsPatternExpressionSyntax isExpression,
 		}
-		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart);
+		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart))
+		|| (context.IsInAttachedCondition(pattern)
+			&& pattern is RecursivePatternSyntax
+			{
+				Type: null,
+				PositionalPatternClause: null,
+				PropertyPatternClause.Subpatterns.Count: > 0,
+				Parent: SubpatternSyntax,
+			});
 
 	public static void DeclarationPattern(DeclarationPatternSyntax node, PrintContext context)
 	{
@@ -148,7 +154,8 @@ internal static partial class Printers
 		{
 			Node.Print(node.ExpressionColon.Expression, context);
 			TokenPrinter.Print(node.ExpressionColon.ColonToken, context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			if (!BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
+				context.Arena.Synthetic(SyntheticText.Space);
 		}
 
 		Node.Print(node.Pattern, context);

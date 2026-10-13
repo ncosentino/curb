@@ -38,7 +38,9 @@ internal static partial class Printers
 	{
 		var lambdaLayout = context.IsInLogicalLambdaBody(node)
 			&& node.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression;
-		var conditionLayout = context.IsInLogicalConditionHeader(node) || lambdaLayout;
+		var attachedLogicalLayout = context.IsInAttachedCondition(node)
+			&& node.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression;
+		var conditionLayout = context.IsInLogicalConditionHeader(node) || lambdaLayout || attachedLogicalLayout;
 		var style = conditionLayout
 			? WrapStyle.ChopIfLong
 			: context.Options.WrapChainedBinaryExpressions;
@@ -60,12 +62,14 @@ internal static partial class Printers
 		var operands = new List<ExpressionSyntax>();
 		var operators = new List<SyntaxToken>();
 		Flatten(node, operands, operators, nodeBudget: conditionLayout ? 511 : 0);
-		if (lambdaLayout)
+		if (lambdaLayout || attachedLogicalLayout)
 		{
 			for (var i = 0; i < operators.Count; i++)
 			{
 				if (TokenPrinter.HasLeadingContent(operators[i]) || HasTrailingLambdaContent(operands[i].GetLastToken()))
-					throw new LayoutRuleException("A logical lambda cannot move a break around content trivia.");
+					throw new LayoutRuleException(lambdaLayout
+						? "A logical lambda cannot move a break around content trivia."
+						: "A selected condition cannot move a break around content trivia.");
 			}
 		}
 

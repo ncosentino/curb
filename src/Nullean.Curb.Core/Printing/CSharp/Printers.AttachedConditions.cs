@@ -61,16 +61,22 @@ internal static partial class Printers
 			using (arena.Indent())
 				Spacing.InsideControlFlowParensBreakable(context);
 			using (arena.IndentIfBroken(opening))
-				Node.Print(node.Condition, context);
-			using (var close = arena.IfBreak(opening))
 			{
-				using (close.Branch())
-					Spacing.InsideControlFlowParens(context);
-				using (close.Branch())
-				{ }
+				Node.Print(node.Condition, context);
+				using (var close = arena.IfBreak(opening))
+				{
+					using (close.Branch())
+						Spacing.InsideControlFlowParens(context);
+					using (close.Branch())
+					{ }
+				}
+				// Keep the delimiter within the expression's lookahead, but restore statement indentation.
+				using (arena.IndentIfBroken(opening, -1))
+				{
+					arena.LineIfBroken(opening, DocFlags.Reindent);
+					TokenPrinter.Print(node.CloseParenToken, context);
+				}
 			}
-			arena.LineIfBroken(opening, DocFlags.Reindent);
-			TokenPrinter.Print(node.CloseParenToken, context);
 		}
 		finally
 		{
