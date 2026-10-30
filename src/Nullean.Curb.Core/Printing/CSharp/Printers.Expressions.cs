@@ -902,19 +902,39 @@ internal static partial class Printers
 
 	public static void TypeArgumentList(TypeArgumentListSyntax node, PrintContext context)
 	{
-		TokenPrinter.Print(node.LessThanToken, context);
+		PrintTypeList(node.LessThanToken, node.Arguments, node.GreaterThanToken, context);
+	}
 
-		for (var i = 0; i < node.Arguments.Count; i++)
+	private static void PrintTypeList<T>(
+		SyntaxToken open,
+		SeparatedSyntaxList<T> items,
+		SyntaxToken close,
+		PrintContext context)
+		where T : SyntaxNode
+	{
+		var arena = context.Arena;
+		var asWritten = context.AuthorBroke(open.SpanStart, close.Span.End);
+
+		using (arena.Group())
 		{
-			Node.Print(node.Arguments[i], context);
-			if (i >= node.Arguments.SeparatorCount)
-				continue;
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			Spacing.AfterComma(context);
-		}
+			TokenPrinter.Print(open, context);
+			using (arena.Indent())
+			{
+				if (items.Count > 0 && context.AuthorBroke(open.Span.End, items[0].SpanStart))
+					arena.HardLine();
+				else if (!asWritten)
+					arena.SoftLine();
 
-		TokenPrinter.Print(node.GreaterThanToken, context);
+				PrintSeparated(items, context, asWritten);
+			}
+
+			if (items.Count > 0 && context.AuthorBroke(items[^1].Span.End, close.SpanStart))
+				arena.HardLine();
+			else if (!asWritten)
+				arena.SoftLine();
+
+			TokenPrinter.Print(close, context);
+		}
 	}
 
 	public static void NullableType(NullableTypeSyntax node, PrintContext context)

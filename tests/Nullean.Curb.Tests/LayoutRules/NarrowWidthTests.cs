@@ -9,25 +9,25 @@ public class NarrowWidthTests
 	[Arguments(false)]
 	[Arguments(true)]
 	public void Field_types_offer_breaks_at_narrow_width(bool preserve) =>
-		AssertWidth("class Widget { private readonly Func<IReadOnlyList<Item>, string> _format; }", preserve);
+		AssertWidth("class Widget\n{\n    private readonly Func<IReadOnlyList<Item>, string> _format;\n}", preserve);
 
 	[Test]
 	[Arguments(false)]
 	[Arguments(true)]
 	public void Tuple_return_types_offer_breaks_at_narrow_width(bool preserve) =>
-		AssertWidth("class Widget { public (ExecutionOutcome Outcome, IReadOnlyList<string> Calls) Run() { return default; } }", preserve);
+		AssertWidth("class Widget\n{\n    public (ExecutionOutcome Outcome, IReadOnlyList<string> Calls) Run()\n    {\n        return default;\n    }\n}", preserve);
 
 	[Test]
 	[Arguments(false)]
 	[Arguments(true)]
 	public void Nested_initializer_types_offer_breaks_at_narrow_width(bool preserve) =>
-		AssertWidth("class Widget { private readonly IReadOnlyDictionary<string, DisplayStyle> _styles = new System.Collections.ObjectModel.ReadOnlyDictionary<string, DisplayStyle>(new Dictionary<string, DisplayStyle>(StringComparer.Ordinal) { [\"body\"] = new(\"Serif\", \"Black\") }); }", preserve);
+		AssertWidth("class Widget\n{\n    private readonly IReadOnlyDictionary<string, DisplayStyle> _styles = new System.Collections.ObjectModel.ReadOnlyDictionary<string, DisplayStyle>(new Dictionary<string, DisplayStyle>(StringComparer.Ordinal) { [\"body\"] = new(\"Serif\", \"Black\") });\n}", preserve);
 
 	[Test]
 	[Arguments(false)]
 	[Arguments(true)]
 	public void Expression_lambda_arguments_stay_within_narrow_width(bool preserve) =>
-		AssertWidth("class Widget { void Run() { var result = items.Select(item => $\"{item.Name}: \" + item.Amount.ToString(\"0.00\", CultureInfo.InvariantCulture)); } }", preserve);
+		AssertWidth("class Widget\n{\n    void Run()\n    {\n        var result = items.Select(item => $\"{item.Name}: \" + item.Amount.ToString(\"0.00\", CultureInfo.InvariantCulture));\n    }\n}", preserve);
 
 	private static void AssertWidth(string source, bool preserve)
 	{
