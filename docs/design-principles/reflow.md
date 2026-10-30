@@ -33,6 +33,15 @@ With a width, {{product}} owns the layout. Line breaks become a function of your
 width, not of where the previous author happened to press return. A construct either fits on one line
 or breaks; there is no third state carried over from the file's history.
 
+Generic type arguments and tuple type elements offer breaks at their delimiters and commas.
+These breaks also apply inside fields, return types and individual parameters. Preservation
+mode retains existing breaks inside these type lists instead of flattening them.
+
+The width is a layout target, not a way to split individual identifiers or literal contents.
+A fixed point alone does not establish that every physical source line meets the target.
+Long declaration-to-initializer prefixes can still exceed it before the first type argument
+or invocation argument, even when those argument lists wrap.
+
 ## Formal properties
 
 Two properties guide the design, and they are different properties.

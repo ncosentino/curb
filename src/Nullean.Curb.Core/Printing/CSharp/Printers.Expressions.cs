@@ -245,6 +245,20 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 	}
 
+	public static void QualifiedCreationType(QualifiedNameSyntax node, PrintContext context)
+	{
+		using (context.Arena.Group())
+		{
+			Node.Print(node.Left, context);
+			using (context.Arena.Indent())
+			{
+				context.Arena.SoftLine();
+				TokenPrinter.Print(node.DotToken, context);
+				Node.Print(node.Right, context);
+			}
+		}
+	}
+
 	public static void ObjectCreationExpression(ObjectCreationExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.NewKeyword, context);
@@ -358,7 +372,7 @@ internal static partial class Printers
 				// cannot change; Curb's reflow can open a creation out on one run, which would flip
 				// the answer on the next and stop the file settling. Where the author put the brace
 				// is fixed, so it is that which decides.
-				var ownerSpansLines = node.Parent is not null
+				var ownerSpansLines = ownerGroup == 0 && node.Parent is not null
 					&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
 
 				if (openItOut
@@ -902,19 +916,39 @@ internal static partial class Printers
 
 	public static void TypeArgumentList(TypeArgumentListSyntax node, PrintContext context)
 	{
-		TokenPrinter.Print(node.LessThanToken, context);
+		PrintTypeList(node.LessThanToken, node.Arguments, node.GreaterThanToken, context);
+	}
 
-		for (var i = 0; i < node.Arguments.Count; i++)
+	private static void PrintTypeList<T>(
+		SyntaxToken open,
+		SeparatedSyntaxList<T> items,
+		SyntaxToken close,
+		PrintContext context)
+		where T : SyntaxNode
+	{
+		var arena = context.Arena;
+		var asWritten = context.AuthorBroke(open.SpanStart, close.Span.End);
+
+		using (arena.Group())
 		{
-			Node.Print(node.Arguments[i], context);
-			if (i >= node.Arguments.SeparatorCount)
-				continue;
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			Spacing.AfterComma(context);
-		}
+			TokenPrinter.Print(open, context);
+			using (arena.Indent())
+			{
+				if (items.Count > 0 && context.AuthorBroke(open.Span.End, items[0].SpanStart))
+					arena.HardLine();
+				else if (!asWritten)
+					arena.SoftLine();
 
-		TokenPrinter.Print(node.GreaterThanToken, context);
+				PrintSeparated(items, context, asWritten);
+			}
+
+			if (items.Count > 0 && context.AuthorBroke(items[^1].Span.End, close.SpanStart))
+				arena.HardLine();
+			else if (!asWritten)
+				arena.SoftLine();
+
+			TokenPrinter.Print(close, context);
+		}
 	}
 
 	public static void NullableType(NullableTypeSyntax node, PrintContext context)

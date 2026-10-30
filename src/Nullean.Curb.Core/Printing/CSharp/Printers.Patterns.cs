@@ -279,19 +279,7 @@ internal static partial class Printers
 
 	public static void TupleType(TupleTypeSyntax node, PrintContext context)
 	{
-		TokenPrinter.Print(node.OpenParenToken, context);
-
-		for (var i = 0; i < node.Elements.Count; i++)
-		{
-			Node.Print(node.Elements[i], context);
-			if (i >= node.Elements.SeparatorCount)
-				continue;
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Elements.GetSeparator(i), context);
-			Spacing.AfterComma(context);
-		}
-
-		TokenPrinter.Print(node.CloseParenToken, context);
+		PrintTypeList(node.OpenParenToken, node.Elements, node.CloseParenToken, context);
 	}
 
 	public static void TupleElement(TupleElementSyntax node, PrintContext context)

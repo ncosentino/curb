@@ -939,7 +939,13 @@ internal static partial class Printers
 		// happened to spread over lines drops the group as well as the indent, leaving a long
 		// argument no break opportunity at all — it came back out as one over-long line, which the
 		// next run then broke again.
-		if (node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
+		var nestedGenericCreation = node.Arguments.Count == 1
+			&& node.Parent is ObjectCreationExpressionSyntax
+			{
+				Type: GenericNameSyntax or QualifiedNameSyntax { Right: GenericNameSyntax }
+			}
+			&& node.Arguments[0].Expression is ObjectCreationExpressionSyntax { Initializer: not null };
+		if (node.Arguments.Count == 1 && !nestedGenericCreation && EndsWithOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			context.OwnBlockGroup = 0;
