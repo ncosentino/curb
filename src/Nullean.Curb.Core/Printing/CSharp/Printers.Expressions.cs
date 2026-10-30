@@ -372,7 +372,7 @@ internal static partial class Printers
 				// cannot change; Curb's reflow can open a creation out on one run, which would flip
 				// the answer on the next and stop the file settling. Where the author put the brace
 				// is fixed, so it is that which decides.
-				var ownerSpansLines = node.Parent is not null
+				var ownerSpansLines = ownerGroup == 0 && node.Parent is not null
 					&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
 
 				if (openItOut
