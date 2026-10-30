@@ -236,6 +236,11 @@ internal static class Node
 			case SyntaxKind.QualifiedName:
 				{
 					var qualified = (QualifiedNameSyntax)node;
+					if (qualified.Parent is ObjectCreationExpressionSyntax)
+					{
+						Printers.QualifiedCreationType(qualified, context);
+						break;
+					}
 					Print(qualified.Left, context);
 					TokenPrinter.Print(qualified.DotToken, context);
 					Print(qualified.Right, context);

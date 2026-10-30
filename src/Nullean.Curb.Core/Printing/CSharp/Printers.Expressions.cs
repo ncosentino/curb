@@ -245,6 +245,20 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 	}
 
+	public static void QualifiedCreationType(QualifiedNameSyntax node, PrintContext context)
+	{
+		using (context.Arena.Group())
+		{
+			Node.Print(node.Left, context);
+			using (context.Arena.Indent())
+			{
+				context.Arena.SoftLine();
+				TokenPrinter.Print(node.DotToken, context);
+				Node.Print(node.Right, context);
+			}
+		}
+	}
+
 	public static void ObjectCreationExpression(ObjectCreationExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.NewKeyword, context);
