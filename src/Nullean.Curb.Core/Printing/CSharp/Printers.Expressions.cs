@@ -247,9 +247,20 @@ internal static partial class Printers
 
 	public static void ObjectCreationExpression(ObjectCreationExpressionSyntax node, PrintContext context)
 	{
-		TokenPrinter.Print(node.NewKeyword, context);
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Type, context);
+		var arena = context.Arena;
+		using (arena.Group())
+		{
+			TokenPrinter.Print(node.NewKeyword, context);
+			using (arena.Indent())
+			{
+				if (context.AuthorBroke(node.NewKeyword.Span.End, node.Type.SpanStart))
+					arena.HardLine();
+				else
+					arena.Line();
+
+				Node.Print(node.Type, context);
+			}
+		}
 
 		ushort argumentGroup = 0;
 		if (node.ArgumentList is not null)
