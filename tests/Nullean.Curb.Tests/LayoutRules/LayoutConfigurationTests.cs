@@ -10,13 +10,49 @@ public class LayoutConfigurationTests
 {
 	private const string Root = "/repo";
 
-	private static MockFileSystem Repo()
+	private static MockFileSystem Repo(string? policy = null, string? config = null, string? source = null)
 	{
 		var fs = new MockFileSystem();
-		fs.AddFile($"{Root}/.editorconfig", new MockFileData("root = true\n[*.cs]\n" + LayoutRuleSamples.Config + "\ncurb_layout_rules = .curb-layout.json\n"));
-		fs.AddFile($"{Root}/.curb-layout.json", new MockFileData(LayoutRuleSamples.Policy));
-		fs.AddFile($"{Root}/Source.cs", new MockFileData(LayoutRuleSamples.Source));
+		fs.AddFile($"{Root}/.editorconfig", new MockFileData("root = true\n[*.cs]\n" + (config ?? LayoutRuleSamples.Config) + "\ncurb_layout_rules = .curb-layout.json\n"));
+		fs.AddFile($"{Root}/.curb-layout.json", new MockFileData(policy ?? LayoutRuleSamples.Policy));
+		fs.AddFile($"{Root}/Source.cs", new MockFileData(source ?? LayoutRuleSamples.Source));
 		return fs;
+	}
+
+	[Test]
+	public void General_condition_policy_is_loaded_filtered_and_cached_through_editorconfig()
+	{
+		var policy = GeneralConditionLayoutSamples.Policy.Replace("**/*.cs", "Source.cs", StringComparison.Ordinal);
+		var source = GeneralConditionLayoutSamples.Source(GeneralConditionLayoutSamples.Property);
+		var fs = Repo(policy, GeneralConditionLayoutSamples.Config, source);
+		fs.AddFile($"{Root}/Other.cs", new MockFileData(source));
+		var cache = $"{Root}/curb.cache";
+		FormattingRun.Execute(fs, Root, write: true, cachePath: cache).ExitCode.Should().Be(0);
+		fs.File.ReadAllText($"{Root}/Source.cs").TrimEnd().Should().Be(GeneralConditionLayoutSamples.PropertyExpected);
+		fs.File.ReadAllText($"{Root}/Other.cs").TrimEnd().Should().Be(GeneralConditionLayoutSamples.PropertyDefault);
+		FormattingRun.Execute(fs, Root, write: false, cachePath: cache).ExitCode.Should().Be(0);
+		FormattingRun.Execute(fs, Root, write: false, cachePath: cache).Cached.Should().Be(2);
+		var timestamp = fs.File.GetLastWriteTimeUtc($"{Root}/.curb-layout.json");
+		fs.File.WriteAllText($"{Root}/.curb-layout.json", policy.Replace("Source.cs", "Other.cs", StringComparison.Ordinal));
+		fs.File.SetLastWriteTimeUtc($"{Root}/.curb-layout.json", timestamp);
+		var changed = FormattingRun.Execute(fs, Root, write: false, cachePath: cache);
+		changed.ExitCode.Should().Be(1);
+		changed.Cached.Should().Be(0);
+		changed.Changed.Should().Be(2);
+	}
+
+	[Test]
+	public void General_condition_refusal_never_writes_or_caches_unsafe_source()
+	{
+		var source = GeneralConditionLayoutSamples.Source("reading is /* seam */ SensorFrame frame");
+		var fs = Repo(GeneralConditionLayoutSamples.Policy, GeneralConditionLayoutSamples.Config, source);
+		var cache = $"{Root}/curb.cache";
+		var result = FormattingRun.Execute(fs, Root, write: true, cachePath: cache);
+		result.ExitCode.Should().Be(3);
+		result.Failed.Should().Be(1);
+		result.Changed.Should().Be(0);
+		fs.File.ReadAllText($"{Root}/Source.cs").Should().Be(source);
+		FormattingRun.Execute(fs, Root, write: false, cachePath: cache).Cached.Should().Be(0);
 	}
 
 	[Test]

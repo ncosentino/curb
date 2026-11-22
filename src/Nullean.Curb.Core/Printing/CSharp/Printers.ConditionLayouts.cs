@@ -18,14 +18,8 @@ internal static partial class Printers
 			return false;
 
 		var header = TextSpan.FromBounds(node.IfKeyword.SpanStart, node.CloseParenToken.Span.End);
-		if (context.Suppressed is { } suppressed)
-		{
-			foreach (var span in suppressed)
-			{
-				if (span.IntersectsWith(header))
-					return false;
-			}
-		}
+		if (context.IntersectsSuppression(header))
+			return false;
 		if (rules.Count > 1)
 			throw new LayoutRuleException($"Layout rules '{rules[0].Id}' and '{rules[1].Id}' claim the same condition header.");
 		var rule = rules[0];

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
+using Nullean.Curb.LayoutRules;
 
 namespace Nullean.Curb.Printing.CSharp;
 
@@ -9,9 +10,26 @@ internal static partial class Printers
 {
 	public static void IsPatternExpression(IsPatternExpressionSyntax node, PrintContext context)
 	{
+		if (context.IsInAttachedCondition(node)
+			&& (TokenPrinter.HasAnyContent(node.IsKeyword)
+				|| HasTrailingLambdaContent(node.Expression.GetLastToken())
+				|| TokenPrinter.HasLeadingContent(node.Pattern.GetFirstToken())))
+			throw new LayoutRuleException("A selected condition cannot move an is-pattern boundary around content trivia.");
 		Node.Print(node.Expression, context);
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
+
+		if (context.IsInAttachedCondition(node) && ContainsAttachedPropertyPattern(node.Pattern))
+		{
+			using (context.Arena.IndentIf(!ReferenceEquals(node, context.AttachedPropertyRoot)))
+			{
+				if (BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
+					Node.Print(node.Pattern, context);
+				else
+					PrintAttachedPatternGap(node.Pattern, context, alreadyIndented: true);
+			}
+			return;
+		}
 
 		// A bare recursive pattern (`is { ... }`, no type or positional clause ahead of the brace) that
 		// the author kept on the `is` line owns the gap to its own opening brace: that gap answers the
@@ -20,6 +38,11 @@ internal static partial class Printers
 		if (BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
 		{
 			Node.Print(node.Pattern, context);
+			return;
+		}
+		if (context.IsInAttachedCondition(node))
+		{
+			PrintAttachedPatternGap(node.Pattern, context);
 			return;
 		}
 
@@ -35,20 +58,26 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
-	/// pattern directly under an <c>is</c> expression, with nothing between the `is` keyword and the
-	/// pattern in the source. Author-broken input keeps the caller's forced line instead, matching every
-	/// other pattern shape.
+	/// Property-only patterns own their leading brace-line under <c>is</c>, and under a selected
+	/// property's colon. Preserved author breaks remain with the caller.
 	/// </summary>
 	private static bool BareRecursivePatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
-		pattern is RecursivePatternSyntax
+		(pattern is RecursivePatternSyntax
 		{
 			Type: null,
 			PositionalPatternClause: null,
 			PropertyPatternClause.Subpatterns.Count: > 0,
 			Parent: IsPatternExpressionSyntax isExpression,
 		}
-		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart);
+		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart))
+		|| (context.IsInAttachedCondition(pattern)
+			&& pattern is RecursivePatternSyntax
+			{
+				Type: null,
+				PositionalPatternClause: null,
+				PropertyPatternClause.Subpatterns.Count: > 0,
+				Parent: SubpatternSyntax,
+			});
 
 	public static void DeclarationPattern(DeclarationPatternSyntax node, PrintContext context)
 	{
@@ -67,16 +96,21 @@ internal static partial class Printers
 		if (node.PositionalPatternClause is not null)
 		{
 			var positional = node.PositionalPatternClause;
-			TokenPrinter.Print(positional.OpenParenToken, context);
-			for (var i = 0; i < positional.Subpatterns.Count; i++)
+			if (context.IsInAttachedCondition(node))
+				PrintAttachedPositionalPattern(positional, context);
+			else
 			{
-				Node.Print(positional.Subpatterns[i], context);
-				if (i >= positional.Subpatterns.SeparatorCount)
-					continue;
-				TokenPrinter.Print(positional.Subpatterns.GetSeparator(i), context);
-				arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(positional.OpenParenToken, context);
+				for (var i = 0; i < positional.Subpatterns.Count; i++)
+				{
+					Node.Print(positional.Subpatterns[i], context);
+					if (i >= positional.Subpatterns.SeparatorCount)
+						continue;
+					TokenPrinter.Print(positional.Subpatterns.GetSeparator(i), context);
+					arena.Synthetic(SyntheticText.Space);
+				}
+				TokenPrinter.Print(positional.CloseParenToken, context);
 			}
-			TokenPrinter.Print(positional.CloseParenToken, context);
 		}
 
 		if (node.PropertyPatternClause is not null)
@@ -136,9 +170,15 @@ internal static partial class Printers
 	{
 		if (node.ExpressionColon is not null)
 		{
+			if (context.IsInAttachedCondition(node)
+				&& BareRecursivePatternOwnsLeadingBrace(node.Pattern, context)
+				&& (TokenPrinter.HasAnyContent(node.ExpressionColon.ColonToken)
+					|| TokenPrinter.HasLeadingContent(node.Pattern.GetFirstToken())))
+				throw new LayoutRuleException("A selected condition cannot move a property-pattern boundary around content trivia.");
 			Node.Print(node.ExpressionColon.Expression, context);
 			TokenPrinter.Print(node.ExpressionColon.ColonToken, context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			if (!BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
+				context.Arena.Synthetic(SyntheticText.Space);
 		}
 
 		Node.Print(node.Pattern, context);
@@ -147,6 +187,11 @@ internal static partial class Printers
 	/// <summary>Covers <c>and</c>, <c>or</c> and relational patterns, all of which need spacing.</summary>
 	public static void BinaryPattern(BinaryPatternSyntax node, PrintContext context)
 	{
+		if (context.IsInAttachedCondition(node))
+		{
+			PrintAttachedPatternChain(node, context);
+			return;
+		}
 		Node.Print(node.Left, context);
 
 		// The same rule BinaryExpression follows: a chain the author broke stays broken, on whichever

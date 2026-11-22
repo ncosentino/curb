@@ -24,14 +24,8 @@ internal static partial class Printers
 		IReadOnlyList<LayoutRule> rules = IsLogicalLambdaBody(body) ? layoutRules.LogicalLambdas : layoutRules.ExpressionLambdas;
 		if (rules.Count == 0)
 			return false;
-		if (context.Suppressed is { } suppressed)
-		{
-			foreach (var span in suppressed)
-			{
-				if (span.IntersectsWith(node.Span))
-					return false;
-			}
-		}
+		if (context.IntersectsSuppression(node.Span))
+			return false;
 		if (rules.Count > 1)
 			throw new LayoutRuleException($"Layout rules '{rules[0].Id}' and '{rules[1].Id}' claim the same {(IsLogicalLambdaBody(body) ? "logical" : "expression")} lambda argument.");
 		capture = new LambdaLayoutCapture(invocation, lambda, body, rules[0]);

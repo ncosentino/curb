@@ -94,5 +94,19 @@
       "continuation": "one-indent",
       "closeParen": "with-body"
     }
+  }, {
+    "id": "smoke-general-conditions",
+    "files": ["ConditionSample.cs"],
+    "match": {
+      "kind": "condition",
+      "owner": "if-statement"
+    },
+    "layout": {
+      "recipe": "attached-condition",
+      "wrap": "if-long",
+      "header": "inline-if-fits",
+      "continuation": "one-indent",
+      "closeParen": "with-condition"
+    }
   }]
 }
