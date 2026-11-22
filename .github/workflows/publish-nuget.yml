@@ -89,7 +89,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Reverify the immutable promotion input
         shell: pwsh
         env:
@@ -100,7 +100,7 @@ jobs:
         run: |
           $sdk = dotnet --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($sdk -ne '10.0.303') { throw "Unexpected publication SDK: $sdk" }
+          if ($sdk -ne '10.0.404') { throw "Unexpected publication SDK: $sdk" }
           $release = ./build/distribution/Get-PublishedRelease.ps1 -Tag $env:RELEASE_TAG -PackageDirectory (Join-Path $env:RUNNER_TEMP 'promotion-packages')
           if ($release.Version -cne $env:EXPECTED_VERSION -or $release.Commit -cne $env:EXPECTED_COMMIT) {
             throw 'The release identity changed after inspection.'
@@ -137,7 +137,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Verify registry availability and installation
         shell: pwsh
         env:
@@ -148,7 +148,7 @@ jobs:
         run: |
           $sdk = dotnet --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($sdk -ne '10.0.303') { throw "Unexpected verification SDK: $sdk" }
+          if ($sdk -ne '10.0.404') { throw "Unexpected verification SDK: $sdk" }
           $release = ./build/distribution/Get-PublishedRelease.ps1 -Tag $env:RELEASE_TAG -PackageDirectory (Join-Path $env:RUNNER_TEMP 'verification-release')
           if ($release.Version -cne $env:VERSION -or $release.Commit -cne $env:EXPECTED_COMMIT) {
             throw 'The release identity changed before registry verification.'

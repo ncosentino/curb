@@ -54,7 +54,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Run layout-rule tests
         shell: pwsh
         run: |
@@ -80,14 +80,14 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
           dotnet-version: |
-            10.0.303
+            10.0.404
             11.0.100-rc.1.26425.128
       - name: Format and compile preview union fixtures
         shell: pwsh
         run: |
           $sdk = dotnet --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($sdk -ne '10.0.303') { throw "Unexpected formatter SDK: $sdk" }
+          if ($sdk -ne '10.0.404') { throw "Unexpected formatter SDK: $sdk" }
           dotnet build src/Nullean.Curb.Cli -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $dll = Join-Path $PWD '.artifacts/bin/Nullean.Curb.Cli/release/curb.dll'
@@ -126,13 +126,13 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Build and test
         shell: pwsh
         run: |
           $sdk = dotnet --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($sdk -ne '10.0.303') { throw "Unexpected managed SDK: $sdk" }
+          if ($sdk -ne '10.0.404') { throw "Unexpected managed SDK: $sdk" }
           ./build/distribution/Test-PackageValidation.ps1 -TestDirectory (Join-Path $env:RUNNER_TEMP 'package-validation')
           dotnet build -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -156,7 +156,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Native smoke test
         shell: pwsh
         env:
@@ -164,7 +164,7 @@ jobs:
         run: |
           $sdk = dotnet --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($sdk -ne '10.0.303') { throw "Unexpected native SDK: $sdk" }
+          if ($sdk -ne '10.0.404') { throw "Unexpected native SDK: $sdk" }
           dotnet publish examples/curb-aot-smoketest -c Release -r $env:RID
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $extension = if ($IsWindows) { '.exe' } else { '' }
@@ -205,10 +205,10 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Assemble managed and portable packages
         run: |
-          test "$(dotnet --version)" = '10.0.303'
+          test "$(dotnet --version)" = '10.0.404'
           ./build.sh build -s true
           ./build.sh generatepackages -s true
           dotnet pack src/Nullean.Curb.Cli -c Release -r linux-x64 -o build/output
@@ -237,7 +237,7 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/curb-dotnet
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.404
       - name: Check out pinned corpus
         shell: bash
         run: |
@@ -247,7 +247,7 @@ jobs:
           git -C "$RUNNER_TEMP/corpus" checkout --detach FETCH_HEAD
       - name: Build
         run: |
-          test "$(dotnet --version)" = '10.0.303'
+          test "$(dotnet --version)" = '10.0.404'
           ./build.sh build -s true
       - name: Safe formatting, cache and idempotency
         shell: pwsh
