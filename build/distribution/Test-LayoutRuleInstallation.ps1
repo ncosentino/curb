@@ -16,6 +16,7 @@ Get-ChildItem -LiteralPath $fixture -File -Force | Copy-Item -Destination $TestD
 $source = Join-Path $TestDirectory 'LayoutSample.cs'
 $logicalLambdaSource = Join-Path $TestDirectory 'LogicalLambdaSample.cs'
 $expressionLambdaSource = Join-Path $TestDirectory 'ExpressionLambdaSample.cs'
+$conditionSource = Join-Path $TestDirectory 'ConditionSample.cs'
 $policy = Join-Path $TestDirectory '.curb-layout.json'
 $project = Join-Path $TestDirectory 'Probe.csproj'
 $original = [IO.File]::ReadAllText($source)
@@ -45,6 +46,36 @@ if ($PackageVersion) {
     if ($LASTEXITCODE -ne 0) { throw "Logical lambda formatting failed: $LASTEXITCODE" }
     & $Binary @PrefixArguments format --files $expressionLambdaSource
     if ($LASTEXITCODE -ne 0) { throw "Expression lambda formatting failed: $LASTEXITCODE" }
+    & $Binary @PrefixArguments format --files $conditionSource
+    if ($LASTEXITCODE -ne 0) { throw "General condition formatting failed: $LASTEXITCODE" }
+}
+$conditionFormatted = [IO.File]::ReadAllText($conditionSource)
+foreach ($fragment in @(
+    "        if (reading is`n            {`n                Temperature: > MinimumCalibrationTemperature,`n                Humidity: < MaximumCalibrationHumidity`n            } accepted)",
+    "        if (reading is SensorFrame`n            {`n                Temperature: > MinimumCalibrationTemperature,`n                Humidity: < MaximumCalibrationHumidity`n            } accepted)",
+    "        if (reading is not SensorFrame`n            {`n                Temperature: > MinimumCalibrationTemperature,`n                Humidity: < MaximumCalibrationHumidity`n            })",
+    "        if (reading is`n            {`n                Payload:`n                {`n                    Temperature: > RequiredPrimaryReferenceTemperature,`n                    Humidity: < RequiredSecondaryReferenceHumidity`n                }`n            } accepted)",
+    "        if (string.Equals(`n            primaryCalibrationLabel.Trim(),`n            secondaryCalibrationLabel.Trim(),`n            StringComparison.OrdinalIgnoreCase`n        ))",
+    "        if (kind is CalibrationKind.PrimaryReference or`n            CalibrationKind.SecondaryReference or`n            CalibrationKind.BackupReference)",
+    "        if (reading is SensorFrame(`n            RequiredPrimaryReferenceTemperature,`n            RequiredSecondaryReferenceHumidity,`n            CalibrationKind.BackupReference`n        ))",
+    "        if (usePrimary`n            ? int.TryParse(rawPrimaryReading, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)`n            : int.TryParse(rawSecondaryReading, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))",
+    "        if (StringComparer.OrdinalIgnoreCase.Compare(`n            primaryCalibrationLabel.Trim(),`n            secondaryCalibrationLabel.Trim()`n        ) < 0)",
+    "        if (!(reading.Temperature == RequiredPrimaryReferenceTemperature ||`n            reading.Humidity == RequiredSecondaryReferenceHumidity))"
+)) {
+    if (-not $conditionFormatted.Contains($fragment)) {
+        throw "The public condition fixture did not retain its required layout.`nExpected fragment:`n$fragment`nActual fixture:`n$conditionFormatted"
+    }
+}
+& $Binary @PrefixArguments check --files $conditionSource
+if ($LASTEXITCODE -ne 0) { throw "General condition output is not a fixed point: $LASTEXITCODE" }
+$conditionHash = (Get-FileHash -LiteralPath $conditionSource).Hash
+& $Binary @PrefixArguments format --files $conditionSource
+if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $conditionSource).Hash -ne $conditionHash) {
+    throw 'General condition formatting changed on the second pass.'
+}
+$conditionExplanation = & $Binary @PrefixArguments explain-layout $conditionSource
+if ($LASTEXITCODE -ne 0 -or -not ($conditionExplanation -match 'rule = smoke-general-conditions;.*recipe = attached-condition')) {
+    throw 'The general condition recipe was not explained.'
 }
 $expressionLambdaFormatted = [IO.File]::ReadAllText($expressionLambdaSource)
 if (-not $expressionLambdaFormatted.Contains("        if (entries.Any(entry =>`n            entry.Length is not (RequiredMinimumAcceptedTextLength or RequiredSecondaryAcceptedTextLength)))")) {
@@ -119,7 +150,14 @@ if (-not ($explanation -match 'rule = smoke-raw-strings;.*recipe = standalone-ra
 if (-not ($explanation -match 'rule = smoke-string-concatenation;.*recipe = argument-string-concatenation')) { throw 'The string-concatenation recipe was not explained.' }
 $explanation
 & $dotnet build $project --configuration Release
-if ($LASTEXITCODE -ne 0) { throw "The custom layout failed compiler/reference enforcement: $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) {
+    $buildExitCode = $LASTEXITCODE
+    & $dotnet format whitespace $project --no-restore
+    if ($LASTEXITCODE -ne 0) { throw 'The stock formatter could not diagnose the public fixture.' }
+    'Public condition fixture after stock formatting:'
+    [IO.File]::ReadAllText($conditionSource)
+    throw "The custom layout failed compiler/reference enforcement: $buildExitCode"
+}
 & $dotnet format whitespace $project --no-restore --verify-no-changes
 if ($LASTEXITCODE -ne 0) { throw "The custom layout was not a reference fixed point: $LASTEXITCODE" }
 

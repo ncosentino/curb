@@ -255,7 +255,8 @@ internal static partial class Printers
 
 	public static void IfStatement(IfStatementSyntax node, PrintContext context)
 	{
-		if (!TryPrintConditionLayout(node, context) && !TryPrintLambdaCondition(node, context))
+		if (!TryPrintConditionLayout(node, context) && !TryPrintLambdaCondition(node, context)
+			&& !TryPrintAttachedCondition(node, context))
 			ConditionHeader(node.IfKeyword, node.OpenParenToken, node.Condition, node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 

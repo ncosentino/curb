@@ -41,6 +41,19 @@ internal static class LayoutRuleCompiler
 				}
 				var match = rule.GetProperty("match");
 				var layout = rule.GetProperty("layout");
+				if (ReadString(match, "kind") == "condition")
+				{
+					RequireObject(match, "kind", "owner");
+					RequireValue(match, "owner", "if-statement");
+					RequireObject(layout, "recipe", "wrap", "header", "continuation", "closeParen");
+					RequireValue(layout, "recipe", "attached-condition");
+					RequireValue(layout, "wrap", "if-long");
+					RequireValue(layout, "header", "inline-if-fits");
+					RequireValue(layout, "continuation", "one-indent");
+					RequireValue(layout, "closeParen", "with-condition");
+					definitions.Add(new LayoutRuleDefinition(new ConditionLayoutRule(id), files));
+					continue;
+				}
 				if (ReadString(match, "kind") == "expression-lambda-argument")
 				{
 					RequireObject(match, "kind", "owner", "body");
